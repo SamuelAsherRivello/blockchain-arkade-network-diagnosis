@@ -1,6 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assetMintReadiness, balanceReadiness, boardingReadiness, contractReadiness, normalizeRecoveryPhrase, onboardingAutofix, onboardingFailureMessage, onboardingPlan, operatorResult, testAssetRequest } from '../src/detector-core.js';
+import { arkadeNetworks, assetMintReadiness, balanceReadiness, boardingReadiness, getArkadeNetwork, normalizeRecoveryPhrase, onboardingAutofix, onboardingFailureMessage, onboardingPlan, operatorResult, testAssetRequest } from '../src/detector-core.js';
+
+test('defines one verified operator endpoint for each supported test network', () => {
+  assert.deepEqual(arkadeNetworks, {
+    signet: { label: 'Signet', operatorUrl: 'https://signet.arkade.sh' },
+    mutinynet: { label: 'Mutinynet', operatorUrl: 'https://mutinynet.arkade.sh' },
+  });
+  assert.equal(getArkadeNetwork('signet').operatorUrl, 'https://signet.arkade.sh');
+  assert.equal(getArkadeNetwork('mutinynet').operatorUrl, 'https://mutinynet.arkade.sh');
+  assert.throws(() => getArkadeNetwork('mainnet'), /Unsupported Arkade test network/);
+});
 
 test('normalizes a recovery phrase with one space between every word', () => {
   assert.equal(normalizeRecoveryPhrase('  alpha\n beta   gamma\t'), 'alpha beta gamma');
@@ -10,17 +20,21 @@ test('rejects an empty recovery phrase without retaining it', () => {
   assert.throws(() => normalizeRecoveryPhrase('   '), /Enter a recovery phrase/);
 });
 
-test('marks a non-Signet operator response as unavailable', () => {
-  assert.deepEqual(operatorResult({ ok: true, status: 200, info: { network: 'mainnet' } }), {
+test('marks a response for the wrong selected network as unavailable', () => {
+  assert.deepEqual(operatorResult({ ok: true, status: 200, info: { network: 'mainnet' }, expectedNetwork: 'signet' }), {
     status: 'unavailable',
     message: 'Expected Arkade Signet but received mainnet.',
   });
 });
 
-test('reports a reachable Signet operator', () => {
-  assert.deepEqual(operatorResult({ ok: true, status: 200, info: { network: 'signet' } }), {
+test('reports a reachable operator only for the selected network', () => {
+  assert.deepEqual(operatorResult({ ok: true, status: 200, info: { network: 'signet' }, expectedNetwork: 'signet' }), {
     status: 'online',
     message: 'Arkade Signet is reachable.',
+  });
+  assert.deepEqual(operatorResult({ ok: true, status: 200, info: { network: 'mutinynet' }, expectedNetwork: 'mutinynet' }), {
+    status: 'online',
+    message: 'Arkade Mutinynet is reachable.',
   });
 });
 
@@ -103,13 +117,5 @@ test('uses one fixed, non-reissuable test asset request', () => {
   assert.deepEqual(testAssetRequest, {
     amount: 1n,
     metadata: { ticker: 'DTEST', name: 'Detector Test Asset', decimals: 0 },
-  });
-});
-
-test('does not present a one-wallet contract preflight as a fundable contract', () => {
-  assert.deepEqual(contractReadiness({ player: true, game: false, canFund: true }), {
-    status: 'unavailable',
-    backendReachable: 'no',
-    message: 'Attach distinct player and game wallets before creating a contract.',
   });
 });

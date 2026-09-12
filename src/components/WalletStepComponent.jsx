@@ -1,11 +1,11 @@
 import { StepComponent } from './StepComponent.jsx';
 
-export function WalletStepComponent({ phrase, message, address, boardingAddress, loading, loggedIn, onPhraseChange, onLogin, onLogout }) {
+export function WalletStepComponent({ phrase, message, address, boardingAddress, loading, loggedIn, onPhraseChange, onLogin, onLogout, networkLabel }) {
   return (
     <StepComponent
       number="02"
       title="Wallet session"
-      detail="Log in once to keep this Signet wallet available after a page refresh on this browser."
+      detail={`Log in once to keep this ${networkLabel} wallet available after a page refresh on this browser.`}
       status={{ label: loggedIn ? 'Logged in' : 'Logged out', tone: loggedIn ? 'online' : 'neutral' }}
     >
       {loggedIn ? <>
@@ -14,12 +14,10 @@ export function WalletStepComponent({ phrase, message, address, boardingAddress,
           <section>
             <p className="funding-label">Arkade receive address</p>
             <output className="address">{address}</output>
-            <a href="https://arkfaucet.com/" target="_blank" rel="noreferrer">Fund with Ark Faucet</a>
           </section>
           <section>
-            <p className="funding-label">Signet Bitcoin boarding address</p>
+            <p className="funding-label">{networkLabel} Bitcoin boarding address</p>
             <output className="address">{boardingAddress}</output>
-            <a href="https://signet.2nd.dev/" target="_blank" rel="noreferrer">Get Signet BTC</a>
           </section>
         </div>
         <div className="wallet-actions"><button type="button" className="secondary-action" onClick={onLogout} disabled={loading}>Log out</button></div>

@@ -43,8 +43,8 @@ test('renders the diagnostic flow in workflow order across five React steps', as
   assert.match(operator, /OperationListComponent/);
 });
 
-test('rates a verified Signet response as backend reachable', async () => {
-  const result = await runOperation('operator-info', async () => ({
+test('rates a verified selected-network response as backend reachable', async () => {
+  const result = await runOperation('operator-info', 'signet', async () => ({
     ok: true,
     status: 200,
     json: async () => ({ network: 'signet', protocol: 1 }),
@@ -89,33 +89,49 @@ test('preserves React lifecycle, list-key, accessibility, and external-link conv
 
   assert.match(main, /<StrictMode>/);
   assert.match(app, /useEffect\(\(\) => \{[\s\S]*let active = true;/);
-  assert.match(app, /if \(!active\) return;/);
+  assert.match(app, /if \(!active \|\| !isCurrent\(epoch\)\) return;/);
   assert.match(app, /return \(\) => \{ active = false; \};/);
   assert.match(operator, /aria-live="polite"/);
   assert.match(wallet, /aria-live="polite"/);
-  assert.match(wallet, /target="_blank" rel="noreferrer"/);
+  assert.match(app, /target="_blank" rel="noreferrer"/);
   assert.match(accountOperations, /key=\{operation\.id\}/);
   assert.match(operations, /key=\{operation\.id\}/);
 });
 
-test('puts an accessible GitHub repository link at the top of the page', async () => {
+test('puts accessible project resource links and the persisted network selector at the top of the page', async () => {
   const app = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8');
 
-  assert.match(app, /className="github-link"/);
+  assert.match(app, /className="resource-link github-link"/);
   assert.match(app, /href="https:\/\/github\.com\/SamuelAsherRivello\/blockchain-arkade-signet-down-detector"/);
   assert.match(app, /aria-label="Open the Blockchain Arkade Signet Down Detector GitHub repository"/);
+  assert.match(app, /href="https:\/\/docs\.arkadeos\.com\/"/);
+  assert.match(app, /aria-label="Open ArkadeOS documentation"/);
+  assert.match(app, /loadNetworkPreference/);
+  assert.match(app, /saveNetworkPreference/);
+  assert.match(app, /type="radio" name="arkade-network"/);
+  assert.match(app, /ArkadeOS Network API Diagnostics/);
   assert.match(app, /<svg[^>]*aria-hidden="true"/);
 });
 
-test('keeps contract prerequisite guidance scoped to this single-wallet detector', async () => {
+test('creates a one-wallet demo contract and verifies demo asset ownership rather than retaining BIS prerequisites', async () => {
   const [app, wallet] = await Promise.all([
     readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
     readFile(new URL('../src/wallet.js', import.meta.url), 'utf8'),
   ]);
 
-  assert.match(app, /id: 'create-contract', title: 'Check contract prerequisites', description: 'Check the separately logged-in wallet prerequisites that a funded Arkade Signet contract needs\.', action: 'Check contract prerequisites' \}/);
+  assert.match(app, /id: 'create-contract', title: 'Create demo receive contract'/);
+  assert.match(app, /id: 'mint', title: 'Create and verify a demo asset'/);
   assert.doesNotMatch(wallet, /BIS LTO/);
-  assert.match(wallet, /This detector currently supports one attached Signet wallet, so it cannot create a two-party contract\./);
+  assert.match(wallet, /wallet\.getNewAddresses\(\{ types: \['default'\], forceNew: true \}\)/);
+  assert.match(wallet, /ownershipVerified: Boolean\(ownedAsset\)/);
+  assert.doesNotMatch(wallet, /contractReadiness/);
+});
+
+test('makes every operator operation use the selected network', async () => {
+  const source = await readFile(new URL('../src/operations.js', import.meta.url), 'utf8');
+  assert.match(source, /createArkadeOperations\(network = defaultNetwork\)/);
+  assert.match(source, /fetchOperatorInfo\(network, fetchImpl\)/);
+  assert.match(source, /operatorInfoUrl\(network\)/);
 });
 
 test('keeps standalone detector copy free of stale BIS references', async () => {

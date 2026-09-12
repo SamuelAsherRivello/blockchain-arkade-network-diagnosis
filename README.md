@@ -1,17 +1,17 @@
 <!-- AI: This README documents the implemented static detector. Keep the creator banner and section order. -->
 ![Samuel Asher Rivello](documentation/samuel-asher-rivello-banner.png)
 
-# Blockchain Arkade Signet Down Detector
+# ArkadeOS Network API Diagnostics
 
-A browser-only React diagnostic that checks Arkade Signet directly, keeps an encrypted browser-local wallet session, and exposes safe public operator reads with their raw response.
+A browser-only React diagnostic for Arkade Signet and Mutinynet. It keeps an encrypted browser-local wallet session for the selected network and exposes public operator reads with their raw response.
 
 ## Images
 
-<a href="documentation/screenshot01.png"><img src="documentation/screenshot01.png" width="400" alt="Arkade Signet detector interface" /></a>
+<a href="documentation/screenshot01.png"><img src="documentation/screenshot01.png" width="400" alt="ArkadeOS network diagnostics interface" /></a>
 
 ## Demo
 
-* [Arkade Signet detector](https://samuelasherrivello.github.io/blockchain-arkade-signet-down-detector/)
+* [ArkadeOS Network API Diagnostics](https://samuelasherrivello.github.io/blockchain-arkade-signet-down-detector/)
 
 ## Table of Contents
 
@@ -43,11 +43,13 @@ Requires Node.js 24 or newer.
 
 ## Project Overview
 
-The React interface verifies the public operator, attaches a Signet wallet, then separates basic, asset, and contract operations. Each operation displays its returned output and the explicit verdict **Backend reachable: yes** or **Backend reachable: no**. A `yes` requires a reachable response that identifies itself as Signet.
+Choose Signet or Mutinynet before starting. The React interface verifies that public operator, attaches a wallet only for that same network, then separates basic, asset, and contract operations. Changing the network removes the active wallet session and its in-memory records, requires a new login, and persists only the network preference in local storage. Each operation displays its returned output and the explicit verdict **Backend reachable: yes** or **Backend reachable: no**. A `yes` requires a reachable response that identifies itself as the selected network.
 
-Use **Check Arkade Signet** to call `https://signet.arkade.sh/v1/info` from the current browser. The result distinguishes an unavailable browser request from evidence of an operator-wide outage.
+Use **Check Arkade Signet** or **Check Arkade Mutinynet** to call the selected public `/v1/info` endpoint from the current browser. The result distinguishes an unavailable browser request from evidence of an operator-wide outage.
 
-Use **Log in** to enter a recovery phrase with spaces between each word. The phrase is normalized in memory, used to derive Signet Arkade and Bitcoin boarding addresses, then cleared from the form. The encrypted browser-local session can be removed with **Log out**; the phrase is never logged or sent to a project server.
+Use **Log in** to enter a recovery phrase with spaces between each word. The phrase is normalized in memory, used to derive the selected-network Arkade and Bitcoin boarding addresses, then cleared from the form. The encrypted browser-local session can be removed with **Log out**; the phrase is never logged or sent to a project server.
+
+**Create and verify a demo asset** is an explicit write: it issues one fixed, non-reissuable DTEST asset and immediately reads the wallet balance. The result reports `ownershipVerified: true` only when that issued asset is visible in the attached wallet. **Create demo receive contract** creates a fresh one-wallet default receive contract/address that can receive funds; it does not pretend that a two-party or funded contract exists.
 
 ### 📝 Documentation
 
@@ -61,7 +63,7 @@ Use **Log in** to enter a recovery phrase with spaces between each word. The phr
 
 ## Project Details
 
-The Vite application uses React and the Arkade SDK only in the browser. It probes the public Signet `/v1/info` endpoint with a 15-second timeout, then uses the verified route for safe operator, balance, asset, activity, and contract diagnostics. State-changing Signet actions remain explicit button clicks. A supplied phrase is encrypted only in the detector's browser storage, not written to web storage or a project backend.
+The Vite application uses React and the Arkade SDK only in the browser. It probes the selected public `/v1/info` endpoint with a 15-second timeout, then uses that verified route for operator, balance, asset, activity, and contract diagnostics. State-changing actions remain explicit button clicks. A supplied phrase is encrypted only in the detector's browser storage, not written to web storage or a project backend. The selected network is the only value stored in web storage.
 
 ### 📦 AI
 
@@ -69,14 +71,15 @@ The Vite application uses React and the Arkade SDK only in the browser. It probe
 
 ### 📦 Packages
 
-- [Arkade SDK](https://github.com/arkade-os/sdk): Derives a read-only Signet wallet address in the browser.
+- [Arkade SDK](https://github.com/arkade-os/sdk): Derives selected-network wallet addresses and performs the explicit demo actions in the browser.
 - [React](https://react.dev/): Renders the operator, wallet, and account-operation diagnostics.
 - [Vite](https://vite.dev/): Builds the static GitHub Pages site.
 
 ## Resources
 
 - [Arkade documentation](https://docs.arkadeos.com/) - Operator and wallet documentation.
-- [Arkade Signet info endpoint](https://signet.arkade.sh/v1/info) - The public operation this detector checks.
+- [Arkade Signet info endpoint](https://signet.arkade.sh/v1/info) - The Signet public operation this detector checks.
+- [Arkade Mutinynet info endpoint](https://mutinynet.arkade.sh/v1/info) - The Mutinynet public operation this detector checks.
 - [Best Practices](https://www.SamuelAsherRivello.com/best-practices/) - Procedures prescribed as the most effective.
 
 ## Credits

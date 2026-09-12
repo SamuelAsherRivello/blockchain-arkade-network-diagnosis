@@ -1,12 +1,18 @@
 import { InMemoryContractRepository, InMemoryWalletRepository, MnemonicIdentity, ReadonlyWallet, Ramps, RestArkProvider, RestIndexerProvider, Wallet } from '@arkade-os/sdk';
-import { assetMintReadiness, balanceReadiness, boardingReadiness, contractReadiness, normalizeRecoveryPhrase, onboardingAutofix, onboardingFailureMessage, onboardingPlan, testAssetRequest } from './detector-core.js';
+import { assetMintReadiness, balanceReadiness, boardingReadiness, defaultNetwork, getArkadeNetwork, normalizeRecoveryPhrase, onboardingAutofix, onboardingFailureMessage, onboardingPlan, testAssetRequest } from './detector-core.js';
 import { checkOperator } from './operator.js';
 import { clearWalletPhrase, loadWalletPhrase, saveWalletPhrase } from './wallet-session-storage.js';
 
 export { checkOperator } from './operator.js';
 
-const operatorUrl = 'https://signet.arkade.sh';
-const storage = () => ({ walletRepository: new InMemoryWalletRepository(), contractRepository: new InMemoryContractRepository() });
+const sessionStorageByNetwork = new Map();
+const operatorUrl = (network) => getArkadeNetwork(network).operatorUrl;
+const storage = (network) => {
+  if (!sessionStorageByNetwork.has(network)) {
+    sessionStorageByNetwork.set(network, { walletRepository: new InMemoryWalletRepository(), contractRepository: new InMemoryContractRepository() });
+  }
+  return sessionStorageByNetwork.get(network);
+};
 const unavailable = (message, output = '') => ({ backendReachable: 'no', message, output });
 const reachableButBlocked = (message, output = '') => ({ backendReachable: 'yes', message, output });
 
@@ -18,24 +24,25 @@ export function boundedRead(read, timeoutMs, label) {
   return Promise.race([Promise.resolve().then(read), timeout]).finally(() => clearTimeout(timeoutId));
 }
 
-function ensureSession(session) {
+function ensureSession(session, network) {
   if (!session?.identity || !session?.readonlyIdentity) throw new Error('Attach a wallet for this page session first.');
+  if (session.network !== network) throw new Error('The attached wallet belongs to the previously selected network. Log in again for this network.');
 }
 
-async function readonlyWallet(session) {
-  ensureSession(session);
+async function readonlyWallet(session, network) {
+  ensureSession(session, network);
   return ReadonlyWallet.create({
     identity: session.readonlyIdentity,
-    arkProvider: new RestArkProvider(operatorUrl),
-    indexerProvider: new RestIndexerProvider(operatorUrl),
-    storage: storage(),
+    arkProvider: new RestArkProvider(operatorUrl(network)),
+    indexerProvider: new RestIndexerProvider(operatorUrl(network)),
+    storage: storage(network),
     watcherConfig: { failsafePollIntervalMs: 60000, reconnectDelayMs: 60000, maxReconnectAttempts: 1 },
   });
 }
 
-export async function addWallet(phraseInput) {
+export async function addWallet(phraseInput, network = defaultNetwork) {
   const phrase = normalizeRecoveryPhrase(phraseInput);
-  const operator = await checkOperator();
+  const operator = await checkOperator(network);
   if (operator.status !== 'online') throw new Error(operator.message);
 
   let wallet;
@@ -44,41 +51,41 @@ export async function addWallet(phraseInput) {
     const readonlyIdentity = await identity.toReadonly();
     wallet = await ReadonlyWallet.create({
       identity: readonlyIdentity,
-      arkProvider: new RestArkProvider(operatorUrl),
-      indexerProvider: new RestIndexerProvider(operatorUrl),
-      storage: storage(),
+      arkProvider: new RestArkProvider(operatorUrl(network)),
+      indexerProvider: new RestIndexerProvider(operatorUrl(network)),
+      storage: storage(network),
     });
     const arkadeAddress = await wallet.getAddress();
     const boardingAddress = await wallet.getBoardingAddress();
-    if (!arkadeAddress.startsWith('tark1')) throw new Error('The recovery phrase did not produce a Signet Arkade address.');
-    if (!boardingAddress.startsWith('tb1')) throw new Error('The recovery phrase did not produce a Signet Bitcoin boarding address.');
-    return { arkadeAddress, boardingAddress, operator, session: { identity, readonlyIdentity } };
+    if (!arkadeAddress || !boardingAddress) throw new Error(`The recovery phrase did not produce usable ${getArkadeNetwork(network).label} wallet addresses.`);
+    return { arkadeAddress, boardingAddress, operator, session: { identity, readonlyIdentity, network } };
   } finally {
     await wallet?.dispose();
   }
 }
 
-export async function loginWallet(phraseInput) {
+export async function loginWallet(phraseInput, network = defaultNetwork) {
   const phrase = normalizeRecoveryPhrase(phraseInput);
-  const wallet = await addWallet(phrase);
+  const wallet = await addWallet(phrase, network);
   await saveWalletPhrase(phrase);
   return wallet;
 }
 
-export async function restoreWallet() {
+export async function restoreWallet(network = defaultNetwork) {
   const phrase = await loadWalletPhrase();
-  return phrase ? addWallet(phrase) : null;
+  return phrase ? addWallet(phrase, network) : null;
 }
 
-export async function logoutWallet() {
+export async function logoutWallet(network = defaultNetwork) {
   await clearWalletPhrase();
+  sessionStorageByNetwork.delete(network);
 }
 
-export async function inspectAssetMintReadiness(session) {
+export async function inspectAssetMintReadiness(session, network = defaultNetwork) {
   try {
-    const operator = await checkOperator();
+    const operator = await checkOperator(network);
     if (operator.status !== 'online') return { status: 'unavailable', backendReachable: 'no', message: operator.message };
-    const wallet = await readonlyWallet(session);
+    const wallet = await readonlyWallet(session, network);
     try {
     const [spendable, boardingUtxos] = await Promise.all([
       wallet.getSpendableVtxos({ withRecoverable: false, withUnrolled: false }),
@@ -99,19 +106,19 @@ export async function inspectAssetMintReadiness(session) {
   }
 }
 
-export async function onboardFullBalanceForMint(session) {
-  let stage = 'preparing the Signet onboarding request';
+export async function onboardFullBalanceForMint(session, network = defaultNetwork) {
+  let stage = `preparing the ${getArkadeNetwork(network).label} onboarding request`;
   try {
-    ensureSession(session);
-    const operator = await checkOperator();
+    ensureSession(session, network);
+    const operator = await checkOperator(network);
     if (operator.status !== 'online') return unavailable(operator.message);
-    const arkProvider = new RestArkProvider(operatorUrl);
+    const arkProvider = new RestArkProvider(operatorUrl(network));
     const wallet = await Wallet.create({
       identity: session.identity,
       arkProvider,
-      indexerProvider: new RestIndexerProvider(operatorUrl),
+      indexerProvider: new RestIndexerProvider(operatorUrl(network)),
       settlementConfig: false,
-      storage: storage(),
+      storage: storage(network),
     });
     try {
       const registerIntent = arkProvider.registerIntent.bind(arkProvider);
@@ -122,7 +129,7 @@ export async function onboardFullBalanceForMint(session) {
         return intentId;
       };
       const info = await arkProvider.getInfo();
-      if (info.network !== 'signet') return unavailable('The operator did not confirm Signet for this onboarding request.');
+      if (info.network !== network) return unavailable(`The operator did not confirm ${getArkadeNetwork(network).label} for this onboarding request.`);
       if (info.fees.txFeeRate !== '0' || Object.values(info.fees.intentFee).some((fee) => fee !== '' && fee !== '0')) {
         return reachableButBlocked('The operator fee schedule changed. This fixed 50% onboarding action will not submit until its quote is reviewed.');
       }
@@ -137,9 +144,9 @@ export async function onboardFullBalanceForMint(session) {
       const transactionId = await new Ramps(wallet).onboard(info.fees, readiness.inputs, BigInt(plan.firstLegAmountSats));
       return {
         backendReachable: 'yes',
-        message: 'The full Bitcoin-to-Arkade first leg was submitted without a Bitcoin change output. Wait for the Signet batch, then check balance and activity before beginning the separate 50% return leg.',
+        message: `The full Bitcoin-to-Arkade first leg was submitted without a Bitcoin change output. Wait for the ${getArkadeNetwork(network).label} batch, then check balance and activity before beginning the separate 50% return leg.`,
         output: JSON.stringify({
-          from: 'Signet Bitcoin boarding balance',
+          from: `${getArkadeNetwork(network).label} Bitcoin boarding balance`,
           to: 'Arkade spendable balance',
           firstLegAmountSats: plan.firstLegAmountSats,
           targetArkadeSats: plan.targetArkadeSats,
@@ -158,28 +165,28 @@ export async function onboardFullBalanceForMint(session) {
   }
 }
 
-export async function checkAccountBalance(session) {
+export async function checkAccountBalance(session, network = defaultNetwork) {
   try {
-    const operator = await checkOperator();
+    const operator = await checkOperator(network);
     if (operator.status !== 'online') return unavailable(operator.message);
-    const wallet = await readonlyWallet(session);
+    const wallet = await readonlyWallet(session, network);
     try {
       const result = balanceReadiness(wallet.getProviderConnectionState(), await wallet.getBalance());
       if (result.status !== 'ready') return unavailable('The balance indexer did not provide fresh live data; this detector will show balances as unavailable.');
       return {
         backendReachable: 'yes',
-        message: 'Fresh account balance loaded from the Signet wallet providers.',
+        message: `Fresh account balance loaded from the ${getArkadeNetwork(network).label} wallet providers.`,
         output: JSON.stringify(result, null, 2),
       };
     } finally { await wallet.dispose(); }
   } catch { return unavailable('The balance indexer could not provide fresh wallet data; this detector will show balances as unavailable.'); }
 }
 
-export async function listOwnedAssets(session) {
+export async function listOwnedAssets(session, network = defaultNetwork) {
   try {
-    const operator = await checkOperator();
+    const operator = await checkOperator(network);
     if (operator.status !== 'online') return unavailable(operator.message);
-    const wallet = await readonlyWallet(session);
+    const wallet = await readonlyWallet(session, network);
     try {
       const connection = wallet.getProviderConnectionState();
       const balance = await wallet.getBalance();
@@ -188,42 +195,42 @@ export async function listOwnedAssets(session) {
       const assets = (balance.assets ?? []).map((asset) => ({ assetId: asset.assetId, amount: asset.amount.toString() }));
       return {
         backendReachable: 'yes',
-        message: assets.length ? 'Owned assets loaded from the live Signet indexer.' : 'The live Signet indexer reports no owned assets for this wallet.',
+        message: assets.length ? `Owned assets loaded from the live ${getArkadeNetwork(network).label} indexer.` : `The live ${getArkadeNetwork(network).label} indexer reports no owned assets for this wallet.`,
         output: JSON.stringify({ assetCount: assets.length, assets }, null, 2),
       };
     } finally { await wallet.dispose(); }
   } catch { return unavailable('The asset indexer could not provide fresh wallet data; this detector will report assets as unavailable.'); }
 }
 
-export async function listWalletActivity(session) {
+export async function listWalletActivity(session, network = defaultNetwork) {
   try {
-    const operator = await checkOperator();
+    const operator = await checkOperator(network);
     if (operator.status !== 'online') return unavailable(operator.message);
-    const wallet = await readonlyWallet(session);
+    const wallet = await readonlyWallet(session, network);
     try {
       const connection = wallet.getProviderConnectionState();
       if (connection.mode !== 'online' || connection.source !== 'live') return unavailable('The transaction indexer is not live; activity cannot be verified.');
       const activity = await wallet.getActivityHistory();
       return {
         backendReachable: 'yes',
-        message: activity.length ? 'Wallet activity loaded from the live Signet providers.' : 'The live Signet providers report no wallet activity.',
+        message: activity.length ? `Wallet activity loaded from the live ${getArkadeNetwork(network).label} providers.` : `The live ${getArkadeNetwork(network).label} providers report no wallet activity.`,
         output: JSON.stringify(activity.map(({ id, amount, createdAt, settled }) => ({ id, amount, createdAt, settled })), null, 2),
       };
     } finally { await wallet.dispose(); }
   } catch { return unavailable('The transaction indexer could not provide fresh wallet activity.'); }
 }
 
-export async function mintTestAsset(session) {
+export async function mintTestAsset(session, network = defaultNetwork) {
   try {
-    ensureSession(session);
-    const operator = await checkOperator();
+    ensureSession(session, network);
+    const operator = await checkOperator(network);
     if (operator.status !== 'online') return unavailable(operator.message);
     const wallet = await Wallet.create({
       identity: session.identity,
-      arkProvider: new RestArkProvider(operatorUrl),
-      indexerProvider: new RestIndexerProvider(operatorUrl),
+      arkProvider: new RestArkProvider(operatorUrl(network)),
+      indexerProvider: new RestIndexerProvider(operatorUrl(network)),
       settlementConfig: false,
-      storage: storage(),
+      storage: storage(network),
     });
     try {
       const readiness = assetMintReadiness(wallet.getProviderConnectionState(), await wallet.getSpendableVtxos({ withRecoverable: false, withUnrolled: false }), Number(wallet.dustAmount));
@@ -235,21 +242,22 @@ export async function mintTestAsset(session) {
         : unavailable('The live asset provider is not ready for a test mint.', JSON.stringify(readiness, null, 2));
       }
       const result = await wallet.assetManager.issue(testAssetRequest);
+      const ownedAsset = (await wallet.getBalance()).assets?.find((asset) => asset.assetId === result.assetId);
       return {
         backendReachable: 'yes',
-        message: 'Test asset mint submitted. Refresh owned assets to verify delivery.',
-        output: JSON.stringify({ ...testAssetRequest.metadata, amount: testAssetRequest.amount.toString(), assetId: result.assetId, transactionId: result.arkTxId }, null, 2),
+        message: ownedAsset ? 'Demo asset created and ownership verified in the attached wallet.' : 'Demo asset issuance submitted, but ownership is not visible in the fresh wallet balance yet. Recheck owned assets.',
+        output: JSON.stringify({ network, ...testAssetRequest.metadata, issuedAmount: testAssetRequest.amount.toString(), assetId: result.assetId, transactionId: result.arkTxId, ownershipVerified: Boolean(ownedAsset), ownedAmount: ownedAsset?.amount?.toString() ?? null }, null, 2),
       };
     } finally { await wallet.dispose(); }
   } catch { return unavailable('The test asset mint could not be submitted. Check the balance and asset operations for the first unavailable provider.'); }
 }
 
-export async function inspectContracts(session) {
+export async function inspectContracts(session, network = defaultNetwork) {
   let wallet;
   try {
-    const operator = await checkOperator();
+    const operator = await checkOperator(network);
     if (operator.status !== 'online') return unavailable(operator.message);
-    wallet = await boundedRead(() => readonlyWallet(session), 15000, 'Contract wallet setup');
+    wallet = await boundedRead(() => readonlyWallet(session, network), 15000, 'Contract wallet setup');
     const { contracts, state } = await boundedRead(async () => {
       const manager = await wallet.getContractManager();
       return { contracts: await manager.getContractsWithVtxos(), state: manager.getSyncState() };
@@ -257,19 +265,36 @@ export async function inspectContracts(session) {
     if (state.mode !== 'online') return unavailable('The contract indexer is degraded; contract data is not fresh.');
     return {
       backendReachable: 'yes',
-      message: contracts.length ? 'Contract records loaded from the live Signet indexer.' : 'No contract records are visible for this wallet.',
+      message: contracts.length ? `Contract records loaded from the live ${getArkadeNetwork(network).label} indexer.` : 'No contract records are visible for this wallet.',
       output: JSON.stringify(contracts.map(({ contract, vtxos }) => ({ label: contract.label, type: contract.type, state: contract.state, vtxoCount: vtxos.length })), null, 2),
     };
   } catch (error) {
     return unavailable(error instanceof Error && error.message.startsWith('Contract read timed out')
-      ? 'The contract indexer did not respond within 15 seconds. Current Signet contract data is unavailable.'
+      ? `The contract indexer did not respond within 15 seconds. Current ${getArkadeNetwork(network).label} contract data is unavailable.`
       : 'The contract indexer could not provide fresh contract data.');
   } finally { await wallet?.dispose(); }
 }
 
-export async function createTestContract(session) {
-  const operator = await checkOperator();
-  if (operator.status !== 'online') return unavailable(operator.message);
-  const readiness = contractReadiness({ player: Boolean(session), game: false, canFund: false });
-  return reachableButBlocked(`The operator is reachable. ${readiness.message}`, 'This detector currently supports one attached Signet wallet, so it cannot create a two-party contract.');
+export async function createTestContract(session, network = defaultNetwork) {
+  let wallet;
+  try {
+    ensureSession(session, network);
+    const operator = await checkOperator(network);
+    if (operator.status !== 'online') return unavailable(operator.message);
+    wallet = await Wallet.create({
+      identity: session.identity,
+      arkProvider: new RestArkProvider(operatorUrl(network)),
+      indexerProvider: new RestIndexerProvider(operatorUrl(network)),
+      settlementConfig: false,
+      storage: storage(network),
+    });
+    const [demo] = await wallet.getNewAddresses({ types: ['default'], forceNew: true });
+    return {
+      backendReachable: 'yes',
+      message: `A one-wallet default receive contract was created for ${getArkadeNetwork(network).label} and is ready to receive funds.`,
+      output: JSON.stringify({ network, contractType: demo.contract.type, address: demo.address, script: demo.contract.script, state: demo.contract.state }, null, 2),
+    };
+  } catch (error) {
+    return unavailable(error instanceof Error ? error.message : 'The demo receive contract could not be created.');
+  } finally { await wallet?.dispose(); }
 }

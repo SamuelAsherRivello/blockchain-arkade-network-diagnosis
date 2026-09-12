@@ -1,4 +1,4 @@
-export function AssetReadinessOperationComponent({ result, checking, onboardingResult, walletAttached, onCheck }) {
+export function AssetReadinessOperationComponent({ result, checking, onboardingResult, walletAttached, onCheck, networkLabel }) {
   return (
     <div className="asset-readiness-operation">
       <div className="asset-readiness-heading">
@@ -14,7 +14,7 @@ export function AssetReadinessOperationComponent({ result, checking, onboardingR
       {result?.boarding ? <div className="boarding-action">
         <p><strong>Bitcoin boarding route:</strong> {result.boarding.status === 'ready' ? 'Confirmed eligible Bitcoin inputs are available.' : result.boarding.backendReachable === 'yes' ? 'The operator and Bitcoin provider responded, but no confirmed eligible Bitcoin inputs are available.' : 'Unavailable.'}</p>
         {result.boarding.status === 'ready' ? <>
-          <p><strong>Route:</strong> Signet Bitcoin boarding balance &nbsp;→&nbsp; <strong>Arkade spendable balance</strong> &nbsp;→&nbsp; separate Bitcoin return</p>
+          <p><strong>Route:</strong> {networkLabel} Bitcoin boarding balance &nbsp;→&nbsp; <strong>Arkade spendable balance</strong> &nbsp;→&nbsp; separate Bitcoin return</p>
           <p><strong>Target:</strong> {result.boarding.amountSats.toLocaleString()} Arkade sats (50% of {result.boarding.availableSats.toLocaleString()} confirmed Bitcoin sats). The first leg boards the selected total without Bitcoin change; the remaining {result.boarding.retainedBitcoinSats.toLocaleString()} sats needs a separate, receipt-bound return after the first leg is confirmed.</p>
           <p className="mutation-note">This detector needs receipt-bound recovery before it can submit a 50% route. Use Check balance and List activity to reconcile the current inputs; it will not submit them again.</p>
         </> : <p className="mutation-note">No 50% route is available until confirmed eligible Bitcoin inputs are present.</p>}

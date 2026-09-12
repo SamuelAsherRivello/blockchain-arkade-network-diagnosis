@@ -1,7 +1,7 @@
 import { StepComponent } from './StepComponent.jsx';
 import { OperationListComponent } from './OperationListComponent.jsx';
 
-export function OperatorStepComponent({ result, checking, onCheck, operations, results, runningId, onRun }) {
+export function OperatorStepComponent({ result, checking, onCheck, operations, results, runningId, onRun, networkLabel, endpoint }) {
   const status = checking
     ? { label: 'Checking', tone: 'neutral' }
     : result.status === 'online'
@@ -14,12 +14,12 @@ export function OperatorStepComponent({ result, checking, onCheck, operations, r
     <StepComponent
       number="01"
       title="Verify the operator"
-      detail="Call the public Signet endpoint directly from this browser."
+      detail={`Call the public ${networkLabel} endpoint directly from this browser.`}
       status={status}
     >
-      <p className="endpoint">GET <code>https://signet.arkade.sh/v1/info</code></p>
+      <p className="endpoint">GET <code>{endpoint}/v1/info</code></p>
       <div className="operator-check"><button type="button" onClick={onCheck} disabled={checking}>
-        {checking ? 'Checking Arkade Signet…' : 'Check Arkade Signet'}
+        {checking ? `Checking Arkade ${networkLabel}…` : `Check Arkade ${networkLabel}`}
       </button></div>
       <p className="message" aria-live="polite">{result.message}</p>
       <OperationListComponent operations={operations} results={results} runningId={runningId} onRun={onRun} />

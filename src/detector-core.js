@@ -1,4 +1,18 @@
-export const signetInfoUrl = 'https://signet.arkade.sh/v1/info';
+export const defaultNetwork = 'signet';
+export const arkadeNetworks = Object.freeze({
+  signet: Object.freeze({ label: 'Signet', operatorUrl: 'https://signet.arkade.sh' }),
+  mutinynet: Object.freeze({ label: 'Mutinynet', operatorUrl: 'https://mutinynet.arkade.sh' }),
+});
+
+export function getArkadeNetwork(network = defaultNetwork) {
+  const selected = arkadeNetworks[network];
+  if (!selected) throw new Error(`Unsupported Arkade test network: ${network}.`);
+  return selected;
+}
+
+export function operatorInfoUrl(network = defaultNetwork) {
+  return `${getArkadeNetwork(network).operatorUrl}/v1/info`;
+}
 
 export const testAssetRequest = Object.freeze({
   amount: 1n,
@@ -11,10 +25,11 @@ export function normalizeRecoveryPhrase(value) {
   return phrase;
 }
 
-export function operatorResult({ ok, status, info }) {
-  if (!ok) return { status: 'unavailable', message: `Arkade Signet returned HTTP ${status}.` };
-  if (info?.network !== 'signet') return { status: 'unavailable', message: `Expected Arkade Signet but received ${info?.network ?? 'an invalid response'}.` };
-  return { status: 'online', message: 'Arkade Signet is reachable.' };
+export function operatorResult({ ok, status, info, expectedNetwork = defaultNetwork }) {
+  const selected = getArkadeNetwork(expectedNetwork);
+  if (!ok) return { status: 'unavailable', message: `Arkade ${selected.label} returned HTTP ${status}.` };
+  if (info?.network !== expectedNetwork) return { status: 'unavailable', message: `Expected Arkade ${selected.label} but received ${info?.network ?? 'an invalid response'}.` };
+  return { status: 'online', message: `Arkade ${selected.label} is reachable.` };
 }
 
 export function assetMintReadiness(connection, vtxos, minimumSats) {
@@ -66,7 +81,7 @@ export function onboardingFailureMessage(stage, error) {
   return `Onboarding did not return a confirmed result during ${stage}. ${cause} Do not submit the same Bitcoin inputs again; inspect balance and activity before any recovery action.`;
 }
 
-// Signet rejects an intent that combines Bitcoin boarding inputs with a Bitcoin
+// Arkade test-network onboarding rejects an intent that combines Bitcoin boarding inputs with a Bitcoin
 // change output. A partial target must therefore start by boarding the selected
 // total, with a later, receipt-bound return as a separate settlement.
 export function onboardingPlan(readiness) {
@@ -107,23 +122,5 @@ export function balanceReadiness(connection, balance) {
     totalSats: total,
     bitcoinSats: bitcoin,
     arkadeSats: total - bitcoin,
-  };
-}
-
-export function contractReadiness({ player, game, canFund }) {
-  if (!player || !game) return {
-    status: 'unavailable',
-    backendReachable: 'no',
-    message: 'Attach distinct player and game wallets before creating a contract.',
-  };
-  if (!canFund) return {
-    status: 'unavailable',
-    backendReachable: 'yes',
-    message: 'The operator is reachable, but the game wallet lacks verified contract funds.',
-  };
-  return {
-    status: 'ready',
-    backendReachable: 'yes',
-    message: 'Both wallets and the operator are ready for a funded contract.',
   };
 }

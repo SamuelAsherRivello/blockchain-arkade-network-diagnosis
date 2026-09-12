@@ -1,18 +1,20 @@
-import { signetInfoUrl } from './detector-core.js';
+import { defaultNetwork, getArkadeNetwork, operatorInfoUrl } from './detector-core.js';
 import { fetchOperatorInfo } from './operator.js';
 
-export const arkadeOperations = [
+export function createArkadeOperations(network = defaultNetwork) {
+  const selected = getArkadeNetwork(network);
+  return [
   {
     id: 'operator-info',
     title: 'Read operator information',
     description: 'Fetch the operator identity and supported network.',
-    select: (info) => ({ endpoint: signetInfoUrl, network: info.network, protocol: info.protocol ?? 'Not reported' }),
+    select: (info) => ({ endpoint: operatorInfoUrl(network), network: info.network, protocol: info.protocol ?? 'Not reported' }),
   },
   {
     id: 'network-verification',
-    title: 'Verify Signet network',
-    description: 'Confirm this public endpoint identifies itself as Signet.',
-    select: (info) => ({ expectedNetwork: 'signet', receivedNetwork: info.network, verified: info.network === 'signet' }),
+    title: `Verify ${selected.label} network`,
+    description: `Confirm this public endpoint identifies itself as ${selected.label}.`,
+    select: (info) => ({ expectedNetwork: network, receivedNetwork: info.network, verified: info.network === network }),
   },
   {
     id: 'fee-policy',
@@ -26,17 +28,20 @@ export const arkadeOperations = [
     description: 'Inspect any next-session metadata the public operator publishes.',
     select: (info) => ({ sessionSchedule: info.scheduledSession ?? 'Not reported by this operator response' }),
   },
-];
+  ];
+}
 
-export async function runOperation(operationId, fetchImpl = fetch) {
-  const operation = arkadeOperations.find(({ id }) => id === operationId);
+export const arkadeOperations = createArkadeOperations();
+
+export async function runOperation(operationId, network = defaultNetwork, fetchImpl = fetch) {
+  const operation = createArkadeOperations(network).find(({ id }) => id === operationId);
   if (!operation) throw new Error(`Unknown Arkade operation: ${operationId}`);
 
-  const operator = await fetchOperatorInfo(fetchImpl);
+  const operator = await fetchOperatorInfo(network, fetchImpl);
   const backendReachable = operator.status === 'online' ? 'yes' : 'no';
   const output = operator.status === 'online'
     ? operation.select(operator.info)
-    : { endpoint: signetInfoUrl, httpStatus: operator.statusCode, error: operator.message };
+    : { endpoint: operatorInfoUrl(network), httpStatus: operator.statusCode, error: operator.message };
 
   return {
     id: operation.id,
