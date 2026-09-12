@@ -9,15 +9,15 @@ import { arkadeOperations, runOperation } from './operations.js';
 const initialOperator = { status: 'idle', message: 'No request has been made yet.' };
 const basicOperations = [
   { id: 'balance', title: 'Check account balance', description: 'Read the fresh available, Arkade, and boarding balance for the attached wallet.', action: 'Check balance' },
-  { id: 'activity', title: 'List wallet activity', description: 'Read the wallet activity history without needing to open BIS account details.', action: 'List activity' },
+  { id: 'activity', title: 'List wallet activity', description: 'Read the wallet activity history directly from the live Signet wallet/indexer path.', action: 'List activity' },
 ];
 const assetOperations = [
-  { id: 'assets', title: 'List owned assets', description: 'Read asset ownership directly from the same live wallet/indexer path that BIS uses.', action: 'List owned assets' },
+  { id: 'assets', title: 'List owned assets', description: 'Read asset ownership directly from the live Signet wallet/indexer path.', action: 'List owned assets' },
   { id: 'mint', title: 'Mint a generic test asset', description: 'Issue exactly one non-reissuable Detector Test Asset (DTEST) with no configurable fields.', action: 'Mint Test Asset', mutation: true },
 ];
 const contractOperations = [
   { id: 'contracts', title: 'List detected contracts', description: 'Read the attached wallet’s live contract records and their visible virtual outputs.', action: 'List contracts' },
-  { id: 'create-contract', title: 'Create test contract', description: 'Check the player/game-wallet prerequisites that an actual funded BIS LTO contract needs.', action: 'Create Test Contract', mutation: true },
+  { id: 'create-contract', title: 'Check contract prerequisites', description: 'Check the separately logged-in wallet prerequisites that a funded Arkade Signet contract needs.', action: 'Check contract prerequisites' },
 ];
 
 export function App() {

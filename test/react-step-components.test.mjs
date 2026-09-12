@@ -106,3 +106,26 @@ test('puts an accessible GitHub repository link at the top of the page', async (
   assert.match(app, /aria-label="Open the Blockchain Arkade Signet Down Detector GitHub repository"/);
   assert.match(app, /<svg[^>]*aria-hidden="true"/);
 });
+
+test('keeps contract prerequisite guidance scoped to this single-wallet detector', async () => {
+  const [app, wallet] = await Promise.all([
+    readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/wallet.js', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(app, /id: 'create-contract', title: 'Check contract prerequisites', description: 'Check the separately logged-in wallet prerequisites that a funded Arkade Signet contract needs\.', action: 'Check contract prerequisites' \}/);
+  assert.doesNotMatch(wallet, /BIS LTO/);
+  assert.match(wallet, /This detector currently supports one attached Signet wallet, so it cannot create a two-party contract\./);
+});
+
+test('keeps standalone detector copy free of stale BIS references', async () => {
+  const [app, wallet, core] = await Promise.all([
+    readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/wallet.js', import.meta.url), 'utf8'),
+    readFile(new URL('../src/detector-core.js', import.meta.url), 'utf8'),
+  ]);
+
+  assert.doesNotMatch(app, /\bBIS\b/);
+  assert.doesNotMatch(wallet, /\bBIS\b/);
+  assert.doesNotMatch(core, /\bBIS\b/);
+});

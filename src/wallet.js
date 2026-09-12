@@ -165,14 +165,14 @@ export async function checkAccountBalance(session) {
     const wallet = await readonlyWallet(session);
     try {
       const result = balanceReadiness(wallet.getProviderConnectionState(), await wallet.getBalance());
-      if (result.status !== 'ready') return unavailable('The balance indexer did not provide fresh live data; BIS will show balances as unavailable.');
+      if (result.status !== 'ready') return unavailable('The balance indexer did not provide fresh live data; this detector will show balances as unavailable.');
       return {
         backendReachable: 'yes',
         message: 'Fresh account balance loaded from the Signet wallet providers.',
         output: JSON.stringify(result, null, 2),
       };
     } finally { await wallet.dispose(); }
-  } catch { return unavailable('The balance indexer could not provide fresh wallet data; BIS will show balances as unavailable.'); }
+  } catch { return unavailable('The balance indexer could not provide fresh wallet data; this detector will show balances as unavailable.'); }
 }
 
 export async function listOwnedAssets(session) {
@@ -184,7 +184,7 @@ export async function listOwnedAssets(session) {
       const connection = wallet.getProviderConnectionState();
       const balance = await wallet.getBalance();
       const balanceState = balanceReadiness(connection, balance);
-      if (balanceState.status !== 'ready') return unavailable('The asset indexer did not provide fresh live data; BIS will report assets as unavailable.');
+      if (balanceState.status !== 'ready') return unavailable('The asset indexer did not provide fresh live data; this detector will report assets as unavailable.');
       const assets = (balance.assets ?? []).map((asset) => ({ assetId: asset.assetId, amount: asset.amount.toString() }));
       return {
         backendReachable: 'yes',
@@ -192,7 +192,7 @@ export async function listOwnedAssets(session) {
         output: JSON.stringify({ assetCount: assets.length, assets }, null, 2),
       };
     } finally { await wallet.dispose(); }
-  } catch { return unavailable('The asset indexer could not provide fresh wallet data; BIS will report assets as unavailable.'); }
+  } catch { return unavailable('The asset indexer could not provide fresh wallet data; this detector will report assets as unavailable.'); }
 }
 
 export async function listWalletActivity(session) {
@@ -271,5 +271,5 @@ export async function createTestContract(session) {
   const operator = await checkOperator();
   if (operator.status !== 'online') return unavailable(operator.message);
   const readiness = contractReadiness({ player: Boolean(session), game: false, canFund: false });
-  return reachableButBlocked(`The operator is reachable. ${readiness.message}`, 'A funded BIS LTO contract requires separately logged-in player and game wallets.');
+  return reachableButBlocked(`The operator is reachable. ${readiness.message}`, 'This detector currently supports one attached Signet wallet, so it cannot create a two-party contract.');
 }

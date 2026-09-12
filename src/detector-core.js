@@ -89,8 +89,7 @@ export function onboardingAutofix(readiness, scheduledSession, nowMs = Date.now(
   };
 }
 
-// Mirrors BIS/packages/integration/src/arkade/balance.ts. Cached or malformed
-// values are intentionally not presented as a valid balance.
+// Cached or malformed values are intentionally not presented as a valid balance.
 export function balanceReadiness(connection, balance) {
   const live = connection?.mode === 'online' && connection?.source === 'live';
   const available = balance?.available;
