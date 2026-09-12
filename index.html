@@ -25,7 +25,7 @@
         <div class="section-heading"><div><p class="eyebrow">02</p><h2 id="wallet-heading">Add wallet</h2></div><span class="memory">Memory only</span></div>
         <p class="message">Enter the recovery phrase with one space between words. It stays in this form only long enough to derive a public Signet address; it is never saved or shown.</p>
         <label for="recovery-phrase">Recovery phrase</label>
-        <textarea id="recovery-phrase" rows="3" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="word1 word2 word3 …"></textarea>
+        <input id="recovery-phrase" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="word1 word2 word3 …" />
         <button id="add-wallet" type="button">Add wallet &amp; call operation</button>
         <p id="wallet-message" class="message" aria-live="polite">No wallet is loaded.</p>
         <output id="wallet-address" class="address" aria-live="polite"></output>
