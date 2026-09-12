@@ -66,3 +66,43 @@ test('lists operator checks and exposes a reachable yes or no verdict', async ()
   assert.match(operations, /backendReachable/);
   assert.match(componentSource, /Backend reachable:/);
 });
+
+test('keeps the asset readiness component interface limited to values it renders', async () => {
+  const [app, assetReadiness] = await Promise.all([
+    readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
+    component('AssetReadinessOperationComponent'),
+  ]);
+
+  assert.doesNotMatch(app, /<AssetReadinessOperationComponent[\s\S]*\bonboarding=\{onboarding\}/);
+  assert.doesNotMatch(assetReadiness, /\bonboarding\b/);
+});
+
+test('preserves React lifecycle, list-key, accessibility, and external-link conventions', async () => {
+  const [main, app, operator, wallet, accountOperations, operations] = await Promise.all([
+    readFile(new URL('../src/main.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
+    component('OperatorStepComponent'),
+    component('WalletStepComponent'),
+    component('AccountOperationsStepComponent'),
+    component('OperationListComponent'),
+  ]);
+
+  assert.match(main, /<StrictMode>/);
+  assert.match(app, /useEffect\(\(\) => \{[\s\S]*let active = true;/);
+  assert.match(app, /if \(!active\) return;/);
+  assert.match(app, /return \(\) => \{ active = false; \};/);
+  assert.match(operator, /aria-live="polite"/);
+  assert.match(wallet, /aria-live="polite"/);
+  assert.match(wallet, /target="_blank" rel="noreferrer"/);
+  assert.match(accountOperations, /key=\{operation\.id\}/);
+  assert.match(operations, /key=\{operation\.id\}/);
+});
+
+test('puts an accessible GitHub repository link at the top of the page', async () => {
+  const app = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8');
+
+  assert.match(app, /className="github-link"/);
+  assert.match(app, /href="https:\/\/github\.com\/SamuelAsherRivello\/blockchain-arkade-signet-down-detector"/);
+  assert.match(app, /aria-label="Open the Blockchain Arkade Signet Down Detector GitHub repository"/);
+  assert.match(app, /<svg[^>]*aria-hidden="true"/);
+});

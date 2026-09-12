@@ -31,7 +31,6 @@ export function App() {
   const [walletLoading, setWalletLoading] = useState(false);
   const [assetReadiness, setAssetReadiness] = useState(null);
   const [checkingAssetReadiness, setCheckingAssetReadiness] = useState(false);
-  const [onboarding, setOnboarding] = useState(false);
   const [onboardingResult, setOnboardingResult] = useState(null);
   const [operationResults, setOperationResults] = useState({});
   const [runningOperationId, setRunningOperationId] = useState('');
@@ -148,7 +147,6 @@ export function App() {
   }
 
   async function handleMintAutofix() {
-    setOnboarding(true);
     setRunningAccountOperationId('mint-autofix');
     const pending = { backendReachable: 'pending', message: 'Submitting the full confirmed Signet Bitcoin balance to Arkade…', output: '' };
     setOnboardingResult(pending);
@@ -158,7 +156,6 @@ export function App() {
       setOnboardingResult(result);
       setAccountResults((current) => ({ ...current, mint: result }));
     } finally {
-      setOnboarding(false);
       setRunningAccountOperationId('');
     }
   }
@@ -182,7 +179,18 @@ export function App() {
   return (
     <main className="app-frame">
       <header className="masthead">
-        <div className="brand-lockup"><span className="brand-signal" aria-hidden="true" /><span>Arkade Signet</span></div>
+        <div className="brand-lockup">
+          <div className="brand-name"><span className="brand-signal" aria-hidden="true" /><span>Arkade Signet</span></div>
+          <a
+            className="github-link"
+            href="https://github.com/SamuelAsherRivello/blockchain-arkade-signet-down-detector"
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Open the Blockchain Arkade Signet Down Detector GitHub repository"
+          >
+            <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A11.5 11.5 0 0 0 8.36 22.91c.58.11.79-.25.79-.56v-2.02c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.29-1.7-1.29-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.76.41-1.27.74-1.56-2.57-.29-5.27-1.29-5.27-5.72 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.17 1.19a11.04 11.04 0 0 1 5.77 0c2.2-1.5 3.17-1.19 3.17-1.19.63 1.59.23 2.77.11 3.06.74.81 1.19 1.84 1.19 3.1 0 4.44-2.7 5.43-5.28 5.71.42.36.78 1.07.78 2.16v3.2c0 .31.21.68.8.56A11.5 11.5 0 0 0 12 .5Z" /></svg>
+          </a>
+        </div>
         <div className="masthead-main">
           <div>
             <h1>Operator diagnostics</h1>
@@ -247,7 +255,6 @@ export function App() {
             beforeOperations={<AssetReadinessOperationComponent
               result={assetReadiness}
               checking={checkingAssetReadiness}
-              onboarding={onboarding}
               onboardingResult={onboardingResult}
               walletAttached={Boolean(walletSession)}
               onCheck={handleCheckAssetReadiness}
