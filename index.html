@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="A direct browser health check for Arkade Signet." />
+    <title>Arkade Signet Detector</title>
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <p class="eyebrow">PUBLIC OPERATOR CHECK</p>
+        <h1>Arkade Signet detector</h1>
+        <p class="lede">Check the public Signet operator directly from this browser. A local network failure is reported as local—it is not proof of an Arkade outage.</p>
+      </header>
+
+      <section class="panel" aria-labelledby="operator-heading">
+        <div class="section-heading"><div><p class="eyebrow">01</p><h2 id="operator-heading">Operator</h2></div><span id="operator-status" class="status neutral" role="status">Not checked</span></div>
+        <p class="endpoint">GET <code>https://signet.arkade.sh/v1/info</code></p>
+        <button id="check-operator" type="button">Check Arkade Signet</button>
+        <p id="operator-message" class="message" aria-live="polite">No request has been made.</p>
+      </section>
+
+      <section class="panel" aria-labelledby="wallet-heading">
+        <div class="section-heading"><div><p class="eyebrow">02</p><h2 id="wallet-heading">Add wallet</h2></div><span class="memory">Memory only</span></div>
+        <p class="message">Enter the recovery phrase with one space between words. It stays in this form only long enough to derive a public Signet address; it is never saved or shown.</p>
+        <label for="recovery-phrase">Recovery phrase</label>
+        <textarea id="recovery-phrase" rows="3" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="word1 word2 word3 …"></textarea>
+        <button id="add-wallet" type="button">Add wallet &amp; call operation</button>
+        <p id="wallet-message" class="message" aria-live="polite">No wallet is loaded.</p>
+        <output id="wallet-address" class="address" aria-live="polite"></output>
+      </section>
+
+      <p class="footnote">This detector has no server and no wallet persistence. It only uses the public Arkade Signet endpoint.</p>
+    </main>
+    <script type="module" src="/src/app.js"></script>
+  </body>
+</html>
