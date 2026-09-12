@@ -1,11 +1,24 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { OperatorStepComponent } from './components/OperatorStepComponent.jsx';
 import { WalletStepComponent } from './components/WalletStepComponent.jsx';
-import { OperationStepComponent } from './components/OperationStepComponent.jsx';
-import { checkOperator, addWallet } from './wallet.js';
+import { AssetReadinessOperationComponent } from './components/AssetReadinessOperationComponent.jsx';
+import { AccountOperationsStepComponent } from './components/AccountOperationsStepComponent.jsx';
+import { checkAccountBalance, checkOperator, createTestContract, inspectAssetMintReadiness, inspectContracts, listOwnedAssets, listWalletActivity, loginWallet, logoutWallet, mintTestAsset, onboardFullBalanceForMint, restoreWallet } from './wallet.js';
 import { arkadeOperations, runOperation } from './operations.js';
 
 const initialOperator = { status: 'idle', message: 'No request has been made yet.' };
+const basicOperations = [
+  { id: 'balance', title: 'Check account balance', description: 'Read the fresh available, Arkade, and boarding balance for the attached wallet.', action: 'Check balance' },
+  { id: 'activity', title: 'List wallet activity', description: 'Read the wallet activity history without needing to open BIS account details.', action: 'List activity' },
+];
+const assetOperations = [
+  { id: 'assets', title: 'List owned assets', description: 'Read asset ownership directly from the same live wallet/indexer path that BIS uses.', action: 'List owned assets' },
+  { id: 'mint', title: 'Mint a generic test asset', description: 'Issue exactly one non-reissuable Detector Test Asset (DTEST) with no configurable fields.', action: 'Mint Test Asset', mutation: true },
+];
+const contractOperations = [
+  { id: 'contracts', title: 'List detected contracts', description: 'Read the attached wallet’s live contract records and their visible virtual outputs.', action: 'List contracts' },
+  { id: 'create-contract', title: 'Create test contract', description: 'Check the player/game-wallet prerequisites that an actual funded BIS LTO contract needs.', action: 'Create Test Contract', mutation: true },
+];
 
 export function App() {
   const [operator, setOperator] = useState(initialOperator);
@@ -13,9 +26,17 @@ export function App() {
   const [phrase, setPhrase] = useState('');
   const [walletMessage, setWalletMessage] = useState('No wallet is loaded.');
   const [address, setAddress] = useState('');
+  const [boardingAddress, setBoardingAddress] = useState('');
+  const [walletSession, setWalletSession] = useState(null);
   const [walletLoading, setWalletLoading] = useState(false);
+  const [assetReadiness, setAssetReadiness] = useState(null);
+  const [checkingAssetReadiness, setCheckingAssetReadiness] = useState(false);
+  const [onboarding, setOnboarding] = useState(false);
+  const [onboardingResult, setOnboardingResult] = useState(null);
   const [operationResults, setOperationResults] = useState({});
   const [runningOperationId, setRunningOperationId] = useState('');
+  const [accountResults, setAccountResults] = useState({});
+  const [runningAccountOperationId, setRunningAccountOperationId] = useState('');
   const connectionLabel = checking
     ? 'Testing public route'
     : operator.status === 'online'
@@ -24,6 +45,29 @@ export function App() {
         ? 'Route needs attention'
         : 'Route not tested';
 
+  function applyWallet(wallet, message) {
+    setPhrase('');
+    setOperator(wallet.operator);
+    setWalletSession(wallet.session);
+    setAddress(wallet.arkadeAddress);
+    setBoardingAddress(wallet.boardingAddress);
+    setWalletMessage(message);
+  }
+
+  useEffect(() => {
+    let active = true;
+    setWalletLoading(true);
+    setWalletMessage('Restoring encrypted local wallet session…');
+    void restoreWallet().then((wallet) => {
+      if (!active) return;
+      if (wallet) applyWallet(wallet, 'Wallet restored for this browser session.');
+      else setWalletMessage('No wallet is logged in.');
+    }).catch(() => {
+      if (active) setWalletMessage('The saved wallet session could not be restored. Log in again or log out to remove it.');
+    }).finally(() => { if (active) setWalletLoading(false); });
+    return () => { active = false; };
+  }, []);
+
   async function handleCheck() {
     setChecking(true);
     setOperator({ status: 'checking', message: 'Calling the public Arkade Signet endpoint…' });
@@ -31,20 +75,91 @@ export function App() {
     setChecking(false);
   }
 
-  async function handleAddWallet() {
+  async function handleLogin() {
     setWalletLoading(true);
     setAddress('');
-    setWalletMessage('Checking Signet and deriving the public wallet address…');
+    setWalletMessage('Checking Signet and logging in the wallet…');
     try {
-      const wallet = await addWallet(phrase);
-      setPhrase('');
-      setOperator(wallet.operator);
-      setWalletMessage('Wallet added for this page session.');
-      setAddress(wallet.arkadeAddress);
+      applyWallet(await loginWallet(phrase), 'Wallet logged in and saved in encrypted browser storage.');
     } catch (error) {
       setWalletMessage(error instanceof Error ? error.message : 'Wallet setup failed.');
     } finally {
       setWalletLoading(false);
+    }
+  }
+
+  async function handleLogout() {
+    setWalletLoading(true);
+    try {
+      await logoutWallet();
+      setPhrase('');
+      setAddress('');
+      setBoardingAddress('');
+      setWalletSession(null);
+      setAssetReadiness(null);
+      setOnboardingResult(null);
+      setAccountResults({});
+      setWalletMessage('Logged out. The encrypted local wallet session was removed.');
+    } catch {
+      setWalletMessage('The saved wallet session could not be removed.');
+    } finally { setWalletLoading(false); }
+  }
+
+  async function handleRunAccountOperation(operationId) {
+    const operation = [...basicOperations, ...assetOperations, ...contractOperations].find(({ id }) => id === operationId);
+    const runners = {
+      balance: checkAccountBalance,
+      assets: listOwnedAssets,
+      activity: listWalletActivity,
+      mint: mintTestAsset,
+      contracts: inspectContracts,
+      'create-contract': createTestContract,
+    };
+    setRunningAccountOperationId(operationId);
+    setAccountResults((current) => ({ ...current, [operationId]: { backendReachable: 'pending', message: `Calling ${operation.title.toLowerCase()}…`, output: '' } }));
+    try {
+      const result = await runners[operationId](walletSession);
+      setAccountResults((current) => ({ ...current, [operationId]: result }));
+      if (result.backendReachable === 'yes') setOperator({ status: 'online', message: result.message });
+    } catch (error) {
+      setAccountResults((current) => ({
+        ...current,
+        [operationId]: {
+          backendReachable: 'no',
+          message: error instanceof Error ? error.message : 'This account operation could not be completed.',
+          output: '',
+        },
+      }));
+    } finally {
+      setRunningAccountOperationId('');
+    }
+  }
+
+  async function handleCheckAssetReadiness() {
+    setCheckingAssetReadiness(true);
+    setAssetReadiness(null);
+    try {
+      setAssetReadiness(await inspectAssetMintReadiness(walletSession));
+    } catch (error) {
+      setAssetReadiness({ status: 'unavailable', backendReachable: 'no', message: error instanceof Error ? error.message : 'Asset preflight failed.' });
+    } finally {
+      setCheckingAssetReadiness(false);
+    }
+  }
+
+  async function handleMintAutofix() {
+    setOnboarding(true);
+    setRunningAccountOperationId('mint-autofix');
+    const pending = { backendReachable: 'pending', message: 'Submitting the full confirmed Signet Bitcoin balance to Arkade…', output: '' };
+    setOnboardingResult(pending);
+    setAccountResults((current) => ({ ...current, mint: pending }));
+    try {
+      const result = await onboardFullBalanceForMint(walletSession);
+      setOnboardingResult(result);
+      setAccountResults((current) => ({ ...current, mint: result }));
+    } finally {
+      setOnboarding(false);
+      setRunningAccountOperationId('');
     }
   }
 
@@ -66,48 +181,92 @@ export function App() {
 
   return (
     <main className="app-frame">
-      <aside className="control-rail">
+      <header className="masthead">
         <div className="brand-lockup"><span className="brand-signal" aria-hidden="true" /><span>Arkade Signet</span></div>
-        <h1>Operator<br />diagnostics</h1>
-        <p className="rail-intro">A browser-local read of the public operator. A failed request is evidence from this browser, not an outage declaration.</p>
-
-        <dl className="guardrails">
-          <div><dt>Route</dt><dd>Direct browser call</dd></div>
-          <div><dt>Network</dt><dd>Signet only</dd></div>
-          <div><dt>Wallet mode</dt><dd>Read-only memory</dd></div>
-        </dl>
-
-        <p className="rail-note">Work through the runbook in order, or use the public operation reads to isolate the response you need.</p>
-      </aside>
-
-      <section className="workspace" aria-label="Arkade Signet diagnostic workspace">
-        <header className="workspace-header">
+        <div className="masthead-main">
           <div>
-            <h2>Runbook</h2>
-            <p>Verify the operator, then inspect the public response surface.</p>
+            <h1>Operator diagnostics</h1>
+            <p className="masthead-intro">A browser-local read of the public operator. A failed request is evidence from this browser, not an outage declaration.</p>
           </div>
           <p className={`route-indicator ${operator.status}`}><span aria-hidden="true" />{connectionLabel}</p>
-        </header>
+        </div>
+        <dl className="context-line">
+          <div><dt>Route</dt><dd>Direct browser call</dd></div>
+          <div><dt>Network</dt><dd>Signet only</dd></div>
+          <div><dt>Wallet mode</dt><dd>Encrypted browser session</dd></div>
+        </dl>
+      </header>
 
+      <section className="runbook" aria-label="Arkade Signet diagnostic workspace">
+        <header className="runbook-header">
+          <h2>Runbook</h2>
+          <p>Verify the operator, then inspect the public response surface.</p>
+        </header>
         <div className="steps" aria-label="Arkade Signet diagnostic flow">
-          <OperatorStepComponent result={operator} checking={checking} onCheck={handleCheck} />
-          <WalletStepComponent
-            phrase={phrase}
-            message={walletMessage}
-            address={address}
-            loading={walletLoading}
-            onPhraseChange={setPhrase}
-            onAddWallet={handleAddWallet}
-          />
-          <OperationStepComponent
+          <OperatorStepComponent
+            result={operator}
+            checking={checking}
+            onCheck={handleCheck}
             operations={arkadeOperations}
             results={operationResults}
             runningId={runningOperationId}
             onRun={handleRunOperation}
           />
+          <WalletStepComponent
+            phrase={phrase}
+            message={walletMessage}
+          address={address}
+          boardingAddress={boardingAddress}
+          loading={walletLoading}
+          loggedIn={Boolean(walletSession)}
+          onPhraseChange={setPhrase}
+          onLogin={handleLogin}
+          onLogout={handleLogout}
+          />
+          <AccountOperationsStepComponent
+            number="03"
+            title="Basic Operations"
+            detail="Use fresh Signet wallet reads to check the attached account and its recent activity."
+            operations={basicOperations}
+            results={accountResults}
+            runningId={runningAccountOperationId}
+            walletAttached={Boolean(walletSession)}
+            onRun={handleRunAccountOperation}
+            onAutoFix={handleMintAutofix}
+          />
+          <AccountOperationsStepComponent
+            number="04"
+            title="Asset Operations"
+            detail="Confirm asset readiness, inspect ownership, and mint only when the attached Signet wallet is ready."
+            operations={assetOperations}
+            results={accountResults}
+            runningId={runningAccountOperationId}
+            walletAttached={Boolean(walletSession)}
+            onRun={handleRunAccountOperation}
+            onAutoFix={handleMintAutofix}
+            beforeOperations={<AssetReadinessOperationComponent
+              result={assetReadiness}
+              checking={checkingAssetReadiness}
+              onboarding={onboarding}
+              onboardingResult={onboardingResult}
+              walletAttached={Boolean(walletSession)}
+              onCheck={handleCheckAssetReadiness}
+            />}
+          />
+          <AccountOperationsStepComponent
+            number="05"
+            title="Contract Operations"
+            detail="Inspect the attached wallet’s contract records before deliberately checking contract creation prerequisites."
+            operations={contractOperations}
+            results={accountResults}
+            runningId={runningAccountOperationId}
+            walletAttached={Boolean(walletSession)}
+            onRun={handleRunAccountOperation}
+            onAutoFix={handleMintAutofix}
+          />
         </div>
-        <footer>This site has no application server and no wallet persistence. Public checks use <code>signet.arkade.sh</code> directly.</footer>
       </section>
+      <footer>This site has no application server. Wallet login is encrypted in this browser only; public checks use <code>signet.arkade.sh</code> directly.</footer>
     </main>
   );
 }
