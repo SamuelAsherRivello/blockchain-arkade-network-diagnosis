@@ -16,6 +16,13 @@ export function App() {
   const [walletLoading, setWalletLoading] = useState(false);
   const [operationResults, setOperationResults] = useState({});
   const [runningOperationId, setRunningOperationId] = useState('');
+  const connectionLabel = checking
+    ? 'Testing public route'
+    : operator.status === 'online'
+      ? 'Signet route live'
+      : operator.status === 'unavailable'
+        ? 'Route needs attention'
+        : 'Route not tested';
 
   async function handleCheck() {
     setChecking(true);
@@ -58,32 +65,49 @@ export function App() {
   }
 
   return (
-    <main className="shell">
-      <header className="hero">
-        <div className="signal" aria-hidden="true"><span /><span /><span /></div>
-        <h1>Arkade Signet<br />control room</h1>
-        <p className="lede">A browser-local diagnostic for the public Arkade Signet operator. It reports a local failure as local evidence—not proof of an operator-wide outage.</p>
-      </header>
+    <main className="app-frame">
+      <aside className="control-rail">
+        <div className="brand-lockup"><span className="brand-signal" aria-hidden="true" /><span>Arkade Signet</span></div>
+        <h1>Operator<br />diagnostics</h1>
+        <p className="rail-intro">A browser-local read of the public operator. A failed request is evidence from this browser, not an outage declaration.</p>
 
-      <div className="steps" aria-label="Arkade Signet diagnostic flow">
-        <OperatorStepComponent result={operator} checking={checking} onCheck={handleCheck} />
-        <WalletStepComponent
-          phrase={phrase}
-          message={walletMessage}
-          address={address}
-          loading={walletLoading}
-          onPhraseChange={setPhrase}
-          onAddWallet={handleAddWallet}
-        />
-        <OperationStepComponent
-          operations={arkadeOperations}
-          results={operationResults}
-          runningId={runningOperationId}
-          onRun={handleRunOperation}
-        />
-      </div>
+        <dl className="guardrails">
+          <div><dt>Route</dt><dd>Direct browser call</dd></div>
+          <div><dt>Network</dt><dd>Signet only</dd></div>
+          <div><dt>Wallet mode</dt><dd>Read-only memory</dd></div>
+        </dl>
 
-      <footer>This site has no application server and no wallet persistence. Public checks use <code>signet.arkade.sh</code> directly.</footer>
+        <p className="rail-note">Work through the runbook in order, or use the public operation reads to isolate the response you need.</p>
+      </aside>
+
+      <section className="workspace" aria-label="Arkade Signet diagnostic workspace">
+        <header className="workspace-header">
+          <div>
+            <h2>Runbook</h2>
+            <p>Verify the operator, then inspect the public response surface.</p>
+          </div>
+          <p className={`route-indicator ${operator.status}`}><span aria-hidden="true" />{connectionLabel}</p>
+        </header>
+
+        <div className="steps" aria-label="Arkade Signet diagnostic flow">
+          <OperatorStepComponent result={operator} checking={checking} onCheck={handleCheck} />
+          <WalletStepComponent
+            phrase={phrase}
+            message={walletMessage}
+            address={address}
+            loading={walletLoading}
+            onPhraseChange={setPhrase}
+            onAddWallet={handleAddWallet}
+          />
+          <OperationStepComponent
+            operations={arkadeOperations}
+            results={operationResults}
+            runningId={runningOperationId}
+            onRun={handleRunOperation}
+          />
+        </div>
+        <footer>This site has no application server and no wallet persistence. Public checks use <code>signet.arkade.sh</code> directly.</footer>
+      </section>
     </main>
   );
 }

@@ -1,7 +1,7 @@
 export function StepComponent({ number, title, detail, status, children }) {
   const headingId = `step-${number}-heading`;
   return (
-    <section className="step-component" aria-labelledby={headingId}>
+    <section className="step-component" data-step={number} aria-labelledby={headingId}>
       <div className="step-marker" aria-hidden="true">{number}</div>
       <div className="step-content">
         <div className="step-heading">

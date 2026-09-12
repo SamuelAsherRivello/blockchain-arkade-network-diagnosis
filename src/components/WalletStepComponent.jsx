@@ -3,7 +3,7 @@ import { StepComponent } from './StepComponent.jsx';
 export function WalletStepComponent({ phrase, message, address, loading, onPhraseChange, onAddWallet }) {
   return (
     <StepComponent
-      number="2"
+      number="02"
       title="Attach a read-only wallet"
       detail="Derive a public Signet address in this browser without persisting your phrase."
       status={{ label: 'Memory only', tone: 'neutral' }}

@@ -3,7 +3,7 @@ import { StepComponent } from './StepComponent.jsx';
 export function OperationStepComponent({ operations, results, runningId, onRun }) {
   return (
     <StepComponent
-      number="3"
+      number="03"
       title="Inspect public operations"
       detail="Run safe read-only Arkade checks and view the actual browser response."
       status={{ label: 'Public reads', tone: 'neutral' }}
@@ -22,7 +22,7 @@ export function OperationStepComponent({ operations, results, runningId, onRun }
                 {isRunning ? 'Calling…' : 'Run operation'}
               </button>
               {result ? (
-                <div className={`operation-result ${result.backendReachable === 'yes' ? 'result-online' : 'result-unavailable'}`}>
+                <div className={`operation-result ${result.backendReachable === 'yes' ? 'result-online' : result.backendReachable === 'pending' ? 'result-pending' : 'result-unavailable'}`}>
                   <p><strong>Backend reachable:</strong> {result.backendReachable}</p>
                   <p>{result.message}</p>
                   <pre>{result.output}</pre>

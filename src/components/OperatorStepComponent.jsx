@@ -11,7 +11,7 @@ export function OperatorStepComponent({ result, checking, onCheck }) {
 
   return (
     <StepComponent
-      number="1"
+      number="01"
       title="Verify the operator"
       detail="Call the public Signet endpoint directly from this browser."
       status={status}
