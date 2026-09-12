@@ -3,7 +3,7 @@
 
 # Blockchain Arkade Signet Down Detector
 
-A browser-only detector that checks Arkade Signet directly and can derive a public Signet Arkade address from a recovery phrase without storing it.
+A browser-only React diagnostic that checks Arkade Signet directly, derives a public Signet Arkade address without storing a recovery phrase, and exposes safe public operator reads with their raw response.
 
 ## Images
 
@@ -43,6 +43,8 @@ Requires Node.js 24 or newer.
 
 ## Project Overview
 
+The React interface is arranged as three `StepComponent` stages: verify the public operator, attach a temporary read-only wallet, then run typical public Arkade operator reads. Each operation displays its returned output and the explicit verdict **Backend reachable: yes** or **Backend reachable: no**. A `yes` requires a reachable response that identifies itself as Signet.
+
 Use **Check Arkade Signet** to call `https://signet.arkade.sh/v1/info` from the current browser. The result distinguishes an unavailable browser request from evidence of an operator-wide outage.
 
 Use **Add wallet & call operation** to enter a recovery phrase with spaces between each word. The phrase is normalized in memory, used to derive a read-only Signet Arkade address, then cleared from the form. It is never persisted, logged, or added to a server request by this project.
@@ -53,13 +55,13 @@ Use **Add wallet & call operation** to enter a recovery phrase with spaces betwe
 
 ### 📝 Structure
 
-- `src`: Browser UI, operator probe, and read-only wallet operation.
-- `test`: Focused Node tests for phrase normalization and operator results.
+- `src`: React UI, reusable step components, public operator probes, and the read-only wallet operation.
+- `test`: Focused Node tests for phrase normalization, operator results, and the three-step React flow.
 - `.github/workflows`: GitHub Pages deployment workflow.
 
 ## Project Details
 
-The static Vite application uses the Arkade SDK only in the browser. It first probes the public Signet `/v1/info` endpoint with a 15-second timeout. A supplied phrase is not written to local storage or a backend; a temporary read-only SDK wallet derives the public `tark1…` address and is then disposed.
+The Vite application uses React and the Arkade SDK only in the browser. It first probes the public Signet `/v1/info` endpoint with a 15-second timeout. The third step uses the same verified public response to inspect operator information, Signet identity, fee policy, and session metadata without performing wallet-changing operations. A supplied phrase is not written to local storage or a backend; a temporary read-only SDK wallet derives the public `tark1…` address and is then disposed.
 
 ### 📦 AI
 
@@ -68,6 +70,7 @@ The static Vite application uses the Arkade SDK only in the browser. It first pr
 ### 📦 Packages
 
 - [Arkade SDK](https://github.com/arkade-os/sdk): Derives a read-only Signet wallet address in the browser.
+- [React](https://react.dev/): Renders the three-step diagnostic interface.
 - [Vite](https://vite.dev/): Builds the static GitHub Pages site.
 
 ## Resources

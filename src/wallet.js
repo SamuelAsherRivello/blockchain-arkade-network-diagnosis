@@ -1,21 +1,8 @@
 import { InMemoryContractRepository, InMemoryWalletRepository, MnemonicIdentity, ReadonlyWallet, RestArkProvider } from '@arkade-os/sdk';
-import { normalizeRecoveryPhrase, operatorResult, signetInfoUrl } from './detector-core.js';
+import { normalizeRecoveryPhrase } from './detector-core.js';
+import { checkOperator } from './operator.js';
 
-const timeoutMs = 15_000;
-
-export async function checkOperator(fetchImpl = fetch) {
-  try {
-    const response = await fetchImpl(signetInfoUrl, {
-      cache: 'no-store',
-      headers: { accept: 'application/json' },
-      signal: AbortSignal.timeout(timeoutMs),
-    });
-    const info = await response.json();
-    return { ...operatorResult({ ok: response.ok, status: response.status, info }), info };
-  } catch {
-    return { status: 'unavailable', message: 'Arkade Signet could not be reached from this browser.' };
-  }
-}
+export { checkOperator } from './operator.js';
 
 export async function addWallet(phraseInput) {
   const phrase = normalizeRecoveryPhrase(phraseInput);
