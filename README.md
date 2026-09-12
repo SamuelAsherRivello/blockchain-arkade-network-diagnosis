@@ -3,7 +3,7 @@
 
 # Blockchain Arkade Signet Down Detector
 
-A browser-only React diagnostic that checks Arkade Signet directly, derives a public Signet Arkade address without storing a recovery phrase, and exposes safe public operator reads with their raw response.
+A browser-only React diagnostic that checks Arkade Signet directly, keeps an encrypted browser-local wallet session, and exposes safe public operator reads with their raw response.
 
 ## Images
 
@@ -43,11 +43,11 @@ Requires Node.js 24 or newer.
 
 ## Project Overview
 
-The React interface is arranged as three `StepComponent` stages: verify the public operator, attach a temporary read-only wallet, then run typical public Arkade operator reads. Each operation displays its returned output and the explicit verdict **Backend reachable: yes** or **Backend reachable: no**. A `yes` requires a reachable response that identifies itself as Signet.
+The React interface verifies the public operator, attaches a Signet wallet, then separates basic, asset, and contract operations. Each operation displays its returned output and the explicit verdict **Backend reachable: yes** or **Backend reachable: no**. A `yes` requires a reachable response that identifies itself as Signet.
 
 Use **Check Arkade Signet** to call `https://signet.arkade.sh/v1/info` from the current browser. The result distinguishes an unavailable browser request from evidence of an operator-wide outage.
 
-Use **Add wallet & call operation** to enter a recovery phrase with spaces between each word. The phrase is normalized in memory, used to derive a read-only Signet Arkade address, then cleared from the form. It is never persisted, logged, or added to a server request by this project.
+Use **Log in** to enter a recovery phrase with spaces between each word. The phrase is normalized in memory, used to derive Signet Arkade and Bitcoin boarding addresses, then cleared from the form. The encrypted browser-local session can be removed with **Log out**; the phrase is never logged or sent to a project server.
 
 ### 📝 Documentation
 
@@ -55,13 +55,13 @@ Use **Add wallet & call operation** to enter a recovery phrase with spaces betwe
 
 ### 📝 Structure
 
-- `src`: React UI, reusable step components, public operator probes, and the read-only wallet operation.
-- `test`: Focused Node tests for phrase normalization, operator results, and the three-step React flow.
+- `src`: React UI, reusable operation components, public operator probes, encrypted local session handling, and wallet operations.
+- `test`: Focused Node tests for phrase normalization, operator results, session handling, and the React diagnostic flow.
 - `.github/workflows`: GitHub Pages deployment workflow.
 
 ## Project Details
 
-The Vite application uses React and the Arkade SDK only in the browser. It first probes the public Signet `/v1/info` endpoint with a 15-second timeout. The third step uses the same verified public response to inspect operator information, Signet identity, fee policy, and session metadata without performing wallet-changing operations. A supplied phrase is not written to local storage or a backend; a temporary read-only SDK wallet derives the public `tark1…` address and is then disposed.
+The Vite application uses React and the Arkade SDK only in the browser. It probes the public Signet `/v1/info` endpoint with a 15-second timeout, then uses the verified route for safe operator, balance, asset, activity, and contract diagnostics. State-changing Signet actions remain explicit button clicks. A supplied phrase is encrypted only in the detector's browser storage, not written to web storage or a project backend.
 
 ### 📦 AI
 
@@ -70,7 +70,7 @@ The Vite application uses React and the Arkade SDK only in the browser. It first
 ### 📦 Packages
 
 - [Arkade SDK](https://github.com/arkade-os/sdk): Derives a read-only Signet wallet address in the browser.
-- [React](https://react.dev/): Renders the three-step diagnostic interface.
+- [React](https://react.dev/): Renders the operator, wallet, and account-operation diagnostics.
 - [Vite](https://vite.dev/): Builds the static GitHub Pages site.
 
 ## Resources
