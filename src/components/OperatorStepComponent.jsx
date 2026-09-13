@@ -12,7 +12,7 @@ export function OperatorStepComponent({ result, checking, onCheck, operations, r
 
   return (
     <StepComponent
-      number="01"
+      number="02"
       title="Verify the operator"
       detail={`Call the public ${networkLabel} endpoint directly from this browser.`}
       status={status}

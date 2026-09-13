@@ -1,9 +1,9 @@
 import { StepComponent } from './StepComponent.jsx';
 
-export function WalletStepComponent({ phrase, message, address, boardingAddress, loading, loggedIn, onPhraseChange, onLogin, onLogout, networkLabel }) {
+export function WalletStepComponent({ phrase, message, address, boardingAddress, loading, loggedIn, onPhraseChange, onLogin, onLogout, networkLabel, funding }) {
   return (
     <StepComponent
-      number="02"
+      number="03"
       title="Wallet session"
       detail={`Log in once to keep this ${networkLabel} wallet available after a page refresh on this browser.`}
       status={{ label: loggedIn ? 'Logged in' : 'Logged out', tone: loggedIn ? 'online' : 'neutral' }}
@@ -18,6 +18,7 @@ export function WalletStepComponent({ phrase, message, address, boardingAddress,
           <section>
             <p className="funding-label">{networkLabel} Bitcoin boarding address</p>
             <output className="address">{boardingAddress}</output>
+            <a href={funding.url} target="_blank" rel="noreferrer" aria-label="Open the selected network faucet">{funding.label}</a>
           </section>
         </div>
         <div className="wallet-actions"><button type="button" className="secondary-action" onClick={onLogout} disabled={loading}>Log out</button></div>

@@ -2,13 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { arkadeNetworks, assetMintReadiness, balanceReadiness, boardingReadiness, getArkadeNetwork, normalizeRecoveryPhrase, onboardingAutofix, onboardingFailureMessage, onboardingPlan, operatorResult, testAssetRequest } from '../src/detector-core.js';
 
-test('defines one verified operator endpoint for each supported test network', () => {
+test('defines one verified operator endpoint and funding source for each supported test network', () => {
   assert.deepEqual(arkadeNetworks, {
-    signet: { label: 'Signet', operatorUrl: 'https://signet.arkade.sh' },
-    mutinynet: { label: 'Mutinynet', operatorUrl: 'https://mutinynet.arkade.sh' },
+    signet: { label: 'Signet', operatorUrl: 'https://signet.arkade.sh', funding: { label: 'Open Signet faucet', url: 'https://signetfaucet.com/' } },
+    mutinynet: { label: 'Mutinynet', operatorUrl: 'https://mutinynet.arkade.sh', funding: { label: 'Open Mutinynet faucet', url: 'https://faucet.mutinynet.com/' } },
   });
   assert.equal(getArkadeNetwork('signet').operatorUrl, 'https://signet.arkade.sh');
   assert.equal(getArkadeNetwork('mutinynet').operatorUrl, 'https://mutinynet.arkade.sh');
+  assert.equal(getArkadeNetwork('signet').funding.url, 'https://signetfaucet.com/');
+  assert.equal(getArkadeNetwork('mutinynet').funding.url, 'https://faucet.mutinynet.com/');
   assert.throws(() => getArkadeNetwork('mainnet'), /Unsupported Arkade test network/);
 });
 

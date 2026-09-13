@@ -13,15 +13,20 @@ test('uses a true password field and does not persist recovery phrases', async (
   assert.doesNotMatch(`${html}\n${source}`, /localStorage|sessionStorage/);
 });
 
-test('shows matching-network receive and boarding addresses without cross-network faucet links', async () => {
-  const [walletSource, componentSource] = await Promise.all([
+test('shows the selected network boarding address with its matching funding link', async () => {
+  const [walletSource, componentSource, appSource] = await Promise.all([
     readFile(new URL('../src/wallet.js', import.meta.url), 'utf8'),
     readFile(new URL('../src/components/WalletStepComponent.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
   ]);
 
   assert.match(walletSource, /getBoardingAddress\(\)/);
   assert.match(componentSource, /\{networkLabel\} Bitcoin boarding address/);
-  assert.doesNotMatch(componentSource, /signet\.2nd\.dev|arkfaucet\.com/);
+  assert.match(componentSource, /href=\{funding\.url\}/);
+  assert.match(componentSource, /target="_blank" rel="noreferrer"/);
+  assert.match(componentSource, /Open the selected network faucet/);
+  assert.doesNotMatch(componentSource, /boardingAddress.*href|href.*boardingAddress/);
+  assert.match(appSource, /funding=\{selectedNetwork\.funding\}/);
 });
 
 test('bounds a stalled backend read instead of leaving the UI pending', async () => {

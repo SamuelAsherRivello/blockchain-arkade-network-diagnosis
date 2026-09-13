@@ -5,10 +5,11 @@ import { runOperation } from '../src/operations.js';
 
 const component = (name) => readFile(new URL(`../src/components/${name}.jsx`, import.meta.url), 'utf8');
 
-test('renders the diagnostic flow in workflow order across five React steps', async () => {
-  const [app, step, operator, wallet, assetReadiness, accountOperations, operations] = await Promise.all([
+test('renders the diagnostic flow in workflow order across six React steps', async () => {
+  const [app, step, network, operator, wallet, assetReadiness, accountOperations, operations] = await Promise.all([
     readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
     component('StepComponent'),
+    component('NetworkStepComponent'),
     component('OperatorStepComponent'),
     component('WalletStepComponent'),
     component('AssetReadinessOperationComponent'),
@@ -19,28 +20,48 @@ test('renders the diagnostic flow in workflow order across five React steps', as
   assert.match(app, /OperatorStepComponent/);
   assert.match(app, /WalletStepComponent/);
   assert.match(app, /AccountOperationsStepComponent/);
+  assert.match(app, /NetworkStepComponent/);
   assert.doesNotMatch(app, /handleOnboardHalfBalance/);
   assert.match(step, /export function StepComponent/);
+  assert.match(network, /number="01"/);
+  assert.match(network, /title="Choose Network"/);
+  assert.match(network, /<select/);
+  assert.match(network, /onChange/);
   assert.match(operator, /StepComponent/);
   assert.match(wallet, /StepComponent/);
   assert.match(wallet, /Log in/);
   assert.match(wallet, /Log out/);
   assert.doesNotMatch(assetReadiness, /StepComponent/);
-  assert.match(assetReadiness, /without Bitcoin change/);
-  assert.match(assetReadiness, /receipt-bound recovery before it can submit a 50% route/);
-  assert.match(assetReadiness, /no confirmed eligible Bitcoin inputs are available/);
-  assert.doesNotMatch(assetReadiness, /onClick=\{onOnboard\}/);
   assert.match(assetReadiness, /Asset indexer reachable:/);
-  assert.match(assetReadiness, /Bitcoin boarding route:/);
+  assert.match(assetReadiness, /Warning: There is not enough spendable Arkade balance for this mint operation\./);
+  assert.doesNotMatch(assetReadiness, /Bitcoin boarding route|receipt-bound recovery|without Bitcoin change/);
   assert.match(accountOperations, /number/);
   assert.match(accountOperations, /title/);
-  assert.match(accountOperations, /Click to transfer/);
-  assert.match(app, /handleMintAutofix/);
+  assert.doesNotMatch(accountOperations, /Click to transfer/);
+  assert.match(app, /'onboard-balance': onboardHalfBalance/);
   assert.match(operations, /export function OperationListComponent/);
-  assert.match(app, /number="03"[\s\S]*title="Basic Operations"/);
-  assert.match(app, /number="04"[\s\S]*title="Asset Operations"/);
-  assert.match(app, /number="05"[\s\S]*title="Contract Operations"/);
+  assert.match(app, /number="04"[\s\S]*title="Basic Operations"/);
+  assert.match(app, /number="05"[\s\S]*title="Asset Operations"/);
+  assert.match(app, /number="06"[\s\S]*title="Contract Operations"/);
+  assert.match(operator, /number="02"/);
+  assert.match(wallet, /number="03"/);
   assert.match(operator, /OperationListComponent/);
+});
+
+test('gives every numbered step an initially expanded collapsible title bar', async () => {
+  const step = await component('StepComponent');
+
+  assert.match(step, /useState\(true\)/);
+  assert.match(step, /className="step-title-bar"/);
+  assert.match(step, /aria-expanded=\{expanded\}/);
+  assert.match(step, /aria-controls=\{contentId\}/);
+  assert.match(step, /id=\{contentId\}/);
+  assert.match(step, /hidden=\{!expanded\}/);
+  assert.match(step, /step-title-status/);
+  assert.match(step, /className="step-title-icon"/);
+  assert.match(step, /viewBox="0 0 24 24"/);
+  assert.match(step, /<path d="M6 9l6 6 6-6"/);
+  assert.doesNotMatch(step, /⌄/);
 });
 
 test('rates a verified selected-network response as backend reachable', async () => {
@@ -98,8 +119,11 @@ test('preserves React lifecycle, list-key, accessibility, and external-link conv
   assert.match(operations, /key=\{operation\.id\}/);
 });
 
-test('puts accessible project resource links and the persisted network selector at the top of the page', async () => {
-  const app = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8');
+test('puts accessible project resource links at the top of the page and the persisted network dropdown in Step 01', async () => {
+  const [app, network] = await Promise.all([
+    readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
+    component('NetworkStepComponent'),
+  ]);
 
   assert.match(app, /className="resource-link github-link"/);
   assert.match(app, /href="https:\/\/github\.com\/SamuelAsherRivello\/blockchain-arkade-signet-down-detector"/);
@@ -108,7 +132,9 @@ test('puts accessible project resource links and the persisted network selector 
   assert.match(app, /aria-label="Open ArkadeOS documentation"/);
   assert.match(app, /loadNetworkPreference/);
   assert.match(app, /saveNetworkPreference/);
-  assert.match(app, /type="radio" name="arkade-network"/);
+  assert.match(network, /id="arkade-network"/);
+  assert.match(network, /<select/);
+  assert.doesNotMatch(app, /type="radio" name="arkade-network"/);
   assert.match(app, /ArkadeOS Network API Diagnostics/);
   assert.match(app, /<svg[^>]*aria-hidden="true"/);
 });

@@ -3,7 +3,8 @@ import { OperatorStepComponent } from './components/OperatorStepComponent.jsx';
 import { WalletStepComponent } from './components/WalletStepComponent.jsx';
 import { AssetReadinessOperationComponent } from './components/AssetReadinessOperationComponent.jsx';
 import { AccountOperationsStepComponent } from './components/AccountOperationsStepComponent.jsx';
-import { checkAccountBalance, checkOperator, createTestContract, inspectAssetMintReadiness, inspectContracts, listOwnedAssets, listWalletActivity, loginWallet, logoutWallet, mintTestAsset, onboardFullBalanceForMint, restoreWallet } from './wallet.js';
+import { NetworkStepComponent } from './components/NetworkStepComponent.jsx';
+import { checkAccountBalance, checkOperator, createTestContract, inspectAssetMintReadiness, inspectContracts, listOwnedAssets, listWalletActivity, loginWallet, logoutWallet, mintTestAsset, onboardHalfBalance, restoreWallet } from './wallet.js';
 import { createArkadeOperations, runOperation } from './operations.js';
 import { arkadeNetworks, getArkadeNetwork } from './detector-core.js';
 import { loadNetworkPreference, saveNetworkPreference } from './network-preference.js';
@@ -15,6 +16,7 @@ const operationsFor = (network) => {
   return {
     basic: [
       { id: 'balance', title: 'Check account balance', description: `Read the fresh available, Arkade, and boarding balance for the attached ${label} wallet.`, action: 'Check balance' },
+      { id: 'onboard-balance', title: 'Onboard Balance (BTC → Arkade, 50%)', description: `Move the eligible ${label} Bitcoin boarding balance into Arkade, then return 50% to Bitcoin after the first leg confirms.`, action: 'Onboard balance', mutation: true },
       { id: 'activity', title: 'List wallet activity', description: `Read the wallet activity history directly from the live ${label} wallet/indexer path.`, action: 'List activity' },
     ],
     assets: [
@@ -41,7 +43,6 @@ export function App() {
   const [networkSwitching, setNetworkSwitching] = useState(false);
   const [assetReadiness, setAssetReadiness] = useState(null);
   const [checkingAssetReadiness, setCheckingAssetReadiness] = useState(false);
-  const [onboardingResult, setOnboardingResult] = useState(null);
   const [operationResults, setOperationResults] = useState({});
   const [runningOperationId, setRunningOperationId] = useState('');
   const [accountResults, setAccountResults] = useState({});
@@ -86,7 +87,7 @@ export function App() {
     try {
       await logoutWallet(network);
       saveNetworkPreference(nextNetwork);
-      setPhrase(''); setAddress(''); setBoardingAddress(''); setWalletSession(null); setAssetReadiness(null); setOnboardingResult(null); setOperationResults({}); setAccountResults({}); setRunningOperationId(''); setRunningAccountOperationId(''); setChecking(false); setCheckingAssetReadiness(false); setOperator(initialOperator);
+      setPhrase(''); setAddress(''); setBoardingAddress(''); setWalletSession(null); setAssetReadiness(null); setOperationResults({}); setAccountResults({}); setRunningOperationId(''); setRunningAccountOperationId(''); setChecking(false); setCheckingAssetReadiness(false); setOperator(initialOperator);
       setNetwork(nextNetwork);
       setWalletMessage(`Network changed to ${getArkadeNetwork(nextNetwork).label}. Log in a wallet for this network.`);
     } catch {
@@ -119,7 +120,7 @@ export function App() {
     try {
       await logoutWallet(network);
       if (!isCurrent(epoch)) return;
-      setPhrase(''); setAddress(''); setBoardingAddress(''); setWalletSession(null); setAssetReadiness(null); setOnboardingResult(null); setAccountResults({}); setWalletMessage('Logged out. The encrypted local wallet session was removed.');
+      setPhrase(''); setAddress(''); setBoardingAddress(''); setWalletSession(null); setAssetReadiness(null); setAccountResults({}); setWalletMessage('Logged out. The encrypted local wallet session was removed.');
     } catch {
       if (isCurrent(epoch)) setWalletMessage('The saved wallet session could not be removed.');
     } finally { if (isCurrent(epoch)) setWalletLoading(false); }
@@ -128,7 +129,7 @@ export function App() {
   async function handleRunAccountOperation(operationId) {
     const epoch = requestEpoch.current;
     const operation = [...accountOperations.basic, ...accountOperations.assets, ...accountOperations.contracts].find(({ id }) => id === operationId);
-    const runners = { balance: checkAccountBalance, assets: listOwnedAssets, activity: listWalletActivity, mint: mintTestAsset, contracts: inspectContracts, 'create-contract': createTestContract };
+    const runners = { balance: checkAccountBalance, 'onboard-balance': onboardHalfBalance, assets: listOwnedAssets, activity: listWalletActivity, mint: mintTestAsset, contracts: inspectContracts, 'create-contract': createTestContract };
     setRunningAccountOperationId(operationId);
     setAccountResults((current) => ({ ...current, [operationId]: { backendReachable: 'pending', message: `Calling ${operation.title.toLowerCase()}…`, output: '' } }));
     try {
@@ -153,17 +154,6 @@ export function App() {
     } finally { if (isCurrent(epoch)) setCheckingAssetReadiness(false); }
   }
 
-  async function handleMintAutofix() {
-    const epoch = requestEpoch.current;
-    setRunningAccountOperationId('mint-autofix');
-    const pending = { backendReachable: 'pending', message: `Submitting the full confirmed ${selectedNetwork.label} Bitcoin balance to Arkade…`, output: '' };
-    setOnboardingResult(pending); setAccountResults((current) => ({ ...current, mint: pending }));
-    try {
-      const result = await onboardFullBalanceForMint(walletSession, network);
-      if (isCurrent(epoch)) { setOnboardingResult(result); setAccountResults((current) => ({ ...current, mint: result })); }
-    } finally { if (isCurrent(epoch)) setRunningAccountOperationId(''); }
-  }
-
   async function handleRunOperation(operationId) {
     const epoch = requestEpoch.current;
     setRunningOperationId(operationId);
@@ -179,9 +169,6 @@ export function App() {
     <main className="app-frame">
       <header className="masthead">
         <div className="masthead-controls">
-          <fieldset className="network-switcher" aria-label="Arkade test network"><legend>Network</legend>
-            {Object.entries(arkadeNetworks).map(([key, option]) => <label className="network-option" key={key}><input type="radio" name="arkade-network" value={key} checked={network === key} onChange={() => handleNetworkChange(key)} disabled={networkSwitching || walletLoading} /><span>{option.label}</span></label>)}
-          </fieldset>
           <nav className="resource-links" aria-label="Project resources">
             <a className="resource-link docs-link" href="https://docs.arkadeos.com/" target="_blank" rel="noreferrer" aria-label="Open ArkadeOS documentation"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="M4 4.8A2.8 2.8 0 0 1 6.8 2H20v17.2H6.8A2.8 2.8 0 0 0 4 22V4.8Z" /><path d="M4 18.5A2.8 2.8 0 0 1 6.8 15.7H20" /></svg></a>
             <a className="resource-link github-link" href="https://github.com/SamuelAsherRivello/blockchain-arkade-signet-down-detector" target="_blank" rel="noreferrer" aria-label="Open the Blockchain Arkade Signet Down Detector GitHub repository"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .5A11.5 11.5 0 0 0 8.36 22.91c.58.11.79-.25.79-.56v-2.02c-3.22.7-3.9-1.37-3.9-1.37-.52-1.34-1.29-1.7-1.29-1.7-1.06-.72.08-.71.08-.71 1.17.08 1.79 1.2 1.79 1.2 1.04 1.79 2.73 1.27 3.4.97.1-.76.41-1.27.74-1.56-2.57-.29-5.27-1.29-5.27-5.72 0-1.26.45-2.29 1.19-3.1-.12-.29-.52-1.47.11-3.06 0 0 .97-.31 3.17 1.19a11.04 11.04 0 0 1 5.77 0c2.2-1.5 3.17-1.19 3.17-1.19.63 1.59.23 2.77.11 3.06.74.81 1.19 1.84 1.19 3.1 0 4.44-2.7 5.43-5.28 5.71.42.36.78 1.07.78 2.16v3.2c0 .31.21.68.8.56A11.5 11.5 0 0 0 12 .5Z" /></svg></a>
@@ -193,11 +180,12 @@ export function App() {
       <section className="runbook" aria-label={`Arkade ${selectedNetwork.label} diagnostic workspace`}>
         <header className="runbook-header"><h2>Runbook</h2><p>Choose a test network, verify its operator, then use the matching wallet session for the demo.</p></header>
         <div className="steps" aria-label={`Arkade ${selectedNetwork.label} diagnostic flow`}>
+          <NetworkStepComponent network={network} networks={arkadeNetworks} onChange={handleNetworkChange} disabled={networkSwitching || walletLoading} />
           <OperatorStepComponent result={operator} checking={checking} onCheck={handleCheck} operations={operatorOperations} results={operationResults} runningId={runningOperationId} onRun={handleRunOperation} networkLabel={selectedNetwork.label} endpoint={selectedNetwork.operatorUrl} />
-          <WalletStepComponent phrase={phrase} message={walletMessage} address={address} boardingAddress={boardingAddress} loading={walletLoading} loggedIn={Boolean(walletSession)} onPhraseChange={setPhrase} onLogin={handleLogin} onLogout={handleLogout} networkLabel={selectedNetwork.label} />
-          <AccountOperationsStepComponent number="03" title="Basic Operations" detail={`Use fresh ${selectedNetwork.label} wallet reads to check the attached account and its recent activity.`} operations={accountOperations.basic} results={accountResults} runningId={runningAccountOperationId} walletAttached={Boolean(walletSession)} onRun={handleRunAccountOperation} onAutoFix={handleMintAutofix} networkLabel={selectedNetwork.label} />
-          <AccountOperationsStepComponent number="04" title="Asset Operations" detail={`Create one ${selectedNetwork.label} demo asset and verify that the attached wallet owns it.`} operations={accountOperations.assets} results={accountResults} runningId={runningAccountOperationId} walletAttached={Boolean(walletSession)} onRun={handleRunAccountOperation} onAutoFix={handleMintAutofix} networkLabel={selectedNetwork.label} beforeOperations={<AssetReadinessOperationComponent result={assetReadiness} checking={checkingAssetReadiness} onboardingResult={onboardingResult} walletAttached={Boolean(walletSession)} onCheck={handleCheckAssetReadiness} networkLabel={selectedNetwork.label} />} />
-          <AccountOperationsStepComponent number="05" title="Contract Operations" detail="Create a one-wallet default receive contract that the attached wallet can fund, then inspect its records." operations={accountOperations.contracts} results={accountResults} runningId={runningAccountOperationId} walletAttached={Boolean(walletSession)} onRun={handleRunAccountOperation} onAutoFix={handleMintAutofix} networkLabel={selectedNetwork.label} />
+          <WalletStepComponent phrase={phrase} message={walletMessage} address={address} boardingAddress={boardingAddress} loading={walletLoading} loggedIn={Boolean(walletSession)} onPhraseChange={setPhrase} onLogin={handleLogin} onLogout={handleLogout} networkLabel={selectedNetwork.label} funding={selectedNetwork.funding} />
+          <AccountOperationsStepComponent number="04" title="Basic Operations" detail={`Use fresh ${selectedNetwork.label} wallet reads to check the attached account and its recent activity.`} operations={accountOperations.basic} results={accountResults} runningId={runningAccountOperationId} walletAttached={Boolean(walletSession)} onRun={handleRunAccountOperation} networkLabel={selectedNetwork.label} />
+          <AccountOperationsStepComponent number="05" title="Asset Operations" detail={`Create one ${selectedNetwork.label} demo asset and verify that the attached wallet owns it.`} operations={accountOperations.assets} results={accountResults} runningId={runningAccountOperationId} walletAttached={Boolean(walletSession)} onRun={handleRunAccountOperation} networkLabel={selectedNetwork.label} beforeOperations={<AssetReadinessOperationComponent result={assetReadiness} checking={checkingAssetReadiness} walletAttached={Boolean(walletSession)} onCheck={handleCheckAssetReadiness} />} />
+          <AccountOperationsStepComponent number="06" title="Contract Operations" detail="Create a one-wallet default receive contract that the attached wallet can fund, then inspect its records." operations={accountOperations.contracts} results={accountResults} runningId={runningAccountOperationId} walletAttached={Boolean(walletSession)} onRun={handleRunAccountOperation} networkLabel={selectedNetwork.label} />
         </div>
       </section>
       <footer>This site has no application server. Wallet login is encrypted in this browser only; public checks use <code>{selectedNetwork.operatorUrl}</code> directly.</footer>

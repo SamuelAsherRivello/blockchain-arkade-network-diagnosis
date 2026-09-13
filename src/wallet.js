@@ -1,5 +1,5 @@
 import { InMemoryContractRepository, InMemoryWalletRepository, MnemonicIdentity, ReadonlyWallet, Ramps, RestArkProvider, RestIndexerProvider, Wallet } from '@arkade-os/sdk';
-import { assetMintReadiness, balanceReadiness, boardingReadiness, defaultNetwork, getArkadeNetwork, normalizeRecoveryPhrase, onboardingAutofix, onboardingFailureMessage, onboardingPlan, testAssetRequest } from './detector-core.js';
+import { assetMintReadiness, balanceReadiness, boardingReadiness, defaultNetwork, getArkadeNetwork, normalizeRecoveryPhrase, onboardingFailureMessage, onboardingPlan, testAssetRequest } from './detector-core.js';
 import { checkOperator } from './operator.js';
 import { clearWalletPhrase, loadWalletPhrase, saveWalletPhrase } from './wallet-session-storage.js';
 
@@ -87,15 +87,10 @@ export async function inspectAssetMintReadiness(session, network = defaultNetwor
     if (operator.status !== 'online') return { status: 'unavailable', backendReachable: 'no', message: operator.message };
     const wallet = await readonlyWallet(session, network);
     try {
-    const [spendable, boardingUtxos] = await Promise.all([
-      wallet.getSpendableVtxos({ withRecoverable: false, withUnrolled: false }),
-      wallet.getBoardingUtxos(),
-    ]);
+    const spendable = await wallet.getSpendableVtxos({ withRecoverable: false, withUnrolled: false });
     const result = assetMintReadiness(wallet.getProviderConnectionState(), spendable, Number(wallet.dustAmount));
-    const boarding = boardingReadiness(wallet.getProviderConnectionState(), boardingUtxos, Number(wallet.dustAmount), true);
     return {
       ...result,
-      boarding,
       message: result.status === 'ready'
         ? result.canMint ? 'Fresh asset prerequisites are ready for a mint attempt.' : 'The asset provider is live, but the wallet lacks the minimum spendable balance to mint.'
         : 'The asset indexer did not provide fresh live data; Admin will report assets as unavailable.',
@@ -106,7 +101,7 @@ export async function inspectAssetMintReadiness(session, network = defaultNetwor
   }
 }
 
-export async function onboardFullBalanceForMint(session, network = defaultNetwork) {
+export async function onboardHalfBalance(session, network = defaultNetwork) {
   let stage = `preparing the ${getArkadeNetwork(network).label} onboarding request`;
   try {
     ensureSession(session, network);
@@ -130,9 +125,6 @@ export async function onboardFullBalanceForMint(session, network = defaultNetwor
       };
       const info = await arkProvider.getInfo();
       if (info.network !== network) return unavailable(`The operator did not confirm ${getArkadeNetwork(network).label} for this onboarding request.`);
-      if (info.fees.txFeeRate !== '0' || Object.values(info.fees.intentFee).some((fee) => fee !== '' && fee !== '0')) {
-        return reachableButBlocked('The operator fee schedule changed. This fixed 50% onboarding action will not submit until its quote is reviewed.');
-      }
       const readiness = boardingReadiness(wallet.getProviderConnectionState(), await wallet.getBoardingUtxos(), Number(wallet.dustAmount), true);
       if (readiness.status !== 'ready') {
         return readiness.backendReachable === 'yes'
@@ -235,10 +227,8 @@ export async function mintTestAsset(session, network = defaultNetwork) {
     try {
       const readiness = assetMintReadiness(wallet.getProviderConnectionState(), await wallet.getSpendableVtxos({ withRecoverable: false, withUnrolled: false }), Number(wallet.dustAmount));
       if (!readiness.canMint) {
-        const boarding = boardingReadiness(wallet.getProviderConnectionState(), await wallet.getBoardingUtxos(), Number(wallet.dustAmount), operator.status === 'online');
-        const autofix = boarding.status === 'ready' ? onboardingAutofix(boarding, operator.info?.scheduledSession) : null;
         return readiness.backendReachable === 'yes'
-        ? { ...reachableButBlocked('The asset backend is reachable, but this wallet lacks the verified spendable balance required for a test mint.', JSON.stringify(readiness, null, 2)), autofix }
+        ? reachableButBlocked('The asset backend is reachable, but this wallet lacks the verified spendable balance required for a test mint.', JSON.stringify(readiness, null, 2))
         : unavailable('The live asset provider is not ready for a test mint.', JSON.stringify(readiness, null, 2));
       }
       const result = await wallet.assetManager.issue(testAssetRequest);
@@ -287,6 +277,7 @@ export async function createTestContract(session, network = defaultNetwork) {
       indexerProvider: new RestIndexerProvider(operatorUrl(network)),
       settlementConfig: false,
       storage: storage(network),
+      walletMode: 'hd',
     });
     const [demo] = await wallet.getNewAddresses({ types: ['default'], forceNew: true });
     return {
@@ -295,6 +286,9 @@ export async function createTestContract(session, network = defaultNetwork) {
       output: JSON.stringify({ network, contractType: demo.contract.type, address: demo.address, script: demo.contract.script, state: demo.contract.state }, null, 2),
     };
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith('cannot allocate a fresh address:')) {
+      return reachableButBlocked('This wallet could not allocate a fresh receive contract. No contract was created; verify that the mnemonic supports HD addresses.', error.message);
+    }
     return unavailable(error instanceof Error ? error.message : 'The demo receive contract could not be created.');
   } finally { await wallet?.dispose(); }
 }

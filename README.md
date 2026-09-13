@@ -43,11 +43,11 @@ Requires Node.js 24 or newer.
 
 ## Project Overview
 
-Choose Signet or Mutinynet before starting. The React interface verifies that public operator, attaches a wallet only for that same network, then separates basic, asset, and contract operations. Changing the network removes the active wallet session and its in-memory records, requires a new login, and persists only the network preference in local storage. Each operation displays its returned output and the explicit verdict **Backend reachable: yes** or **Backend reachable: no**. A `yes` requires a reachable response that identifies itself as the selected network.
+Step 01, **Choose Network**, provides a Signet or Mutinynet dropdown before diagnostics begin. The React interface saves that non-sensitive preference in local storage, verifies the selected public operator, attaches a wallet only for that same network, then separates basic, asset, and contract operations. Changing the network removes the active wallet session and its in-memory records and requires a new login. Each operation displays its returned output and the explicit verdict **Backend reachable: yes** or **Backend reachable: no**. A `yes` requires a reachable response that identifies itself as the selected network.
 
 Use **Check Arkade Signet** or **Check Arkade Mutinynet** to call the selected public `/v1/info` endpoint from the current browser. The result distinguishes an unavailable browser request from evidence of an operator-wide outage.
 
-Use **Log in** to enter a recovery phrase with spaces between each word. The phrase is normalized in memory, used to derive the selected-network Arkade and Bitcoin boarding addresses, then cleared from the form. The encrypted browser-local session can be removed with **Log out**; the phrase is never logged or sent to a project server.
+Use **Log in** to enter a recovery phrase with spaces between each word. The phrase is normalized in memory, used to derive the selected-network Arkade and Bitcoin boarding addresses, then cleared from the form. The wallet view provides the matching Signet or Mutinynet faucet beside that network's boarding address; it never adds the address to the external link. The encrypted browser-local session can be removed with **Log out**; the phrase is never logged or sent to a project server.
 
 **Create and verify a demo asset** is an explicit write: it issues one fixed, non-reissuable DTEST asset and immediately reads the wallet balance. The result reports `ownershipVerified: true` only when that issued asset is visible in the attached wallet. **Create demo receive contract** creates a fresh one-wallet default receive contract/address that can receive funds; it does not pretend that a two-party or funded contract exists.
 

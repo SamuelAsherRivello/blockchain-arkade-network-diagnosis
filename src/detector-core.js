@@ -1,7 +1,7 @@
 export const defaultNetwork = 'signet';
 export const arkadeNetworks = Object.freeze({
-  signet: Object.freeze({ label: 'Signet', operatorUrl: 'https://signet.arkade.sh' }),
-  mutinynet: Object.freeze({ label: 'Mutinynet', operatorUrl: 'https://mutinynet.arkade.sh' }),
+  signet: Object.freeze({ label: 'Signet', operatorUrl: 'https://signet.arkade.sh', funding: Object.freeze({ label: 'Open Signet faucet', url: 'https://signetfaucet.com/' }) }),
+  mutinynet: Object.freeze({ label: 'Mutinynet', operatorUrl: 'https://mutinynet.arkade.sh', funding: Object.freeze({ label: 'Open Mutinynet faucet', url: 'https://faucet.mutinynet.com/' }) }),
 });
 
 export function getArkadeNetwork(network = defaultNetwork) {
