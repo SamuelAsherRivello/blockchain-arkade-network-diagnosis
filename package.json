@@ -1,6 +1,6 @@
 {
-  "name": "blockchain-arkade-signet-down-detector",
-  "version": "0.3.3",
+  "name": "blockchain-arkade-network-diagnosis",
+  "version": "0.3.4",
   "private": true,
   "type": "module",
   "scripts": {

@@ -64,6 +64,14 @@ test('gives every numbered step an initially expanded collapsible title bar', as
   assert.doesNotMatch(step, /⌄/);
 });
 
+test('sizes the collapsible chevron as a compact control icon', async () => {
+  const css = await readFile(new URL('../src/style.css', import.meta.url), 'utf8');
+
+  assert.match(css, /\.step-title-icon\s*\{[^}]*width:\s*1rem/);
+  assert.match(css, /\.step-title-icon\s*\{[^}]*height:\s*1rem/);
+  assert.match(css, /\.step-title-bar\[aria-expanded="false"\]\s+\.step-title-icon/);
+});
+
 test('rates a verified selected-network response as backend reachable', async () => {
   const result = await runOperation('operator-info', 'signet', async () => ({
     ok: true,
@@ -126,8 +134,8 @@ test('puts accessible project resource links at the top of the page and the pers
   ]);
 
   assert.match(app, /className="resource-link github-link"/);
-  assert.match(app, /href="https:\/\/github\.com\/SamuelAsherRivello\/blockchain-arkade-signet-down-detector"/);
-  assert.match(app, /aria-label="Open the Blockchain Arkade Signet Down Detector GitHub repository"/);
+  assert.match(app, /href="https:\/\/github\.com\/SamuelAsherRivello\/blockchain-arkade-network-diagnosis"/);
+  assert.match(app, /aria-label="Open the Arkade OS Network Diagnostics GitHub repository"/);
   assert.match(app, /href="https:\/\/docs\.arkadeos\.com\/"/);
   assert.match(app, /aria-label="Open ArkadeOS documentation"/);
   assert.match(app, /loadNetworkPreference/);
@@ -136,6 +144,7 @@ test('puts accessible project resource links at the top of the page and the pers
   assert.match(network, /<select/);
   assert.doesNotMatch(app, /type="radio" name="arkade-network"/);
   assert.match(app, /ArkadeOS Network API Diagnostics/);
+  assert.doesNotMatch(app, /context-line|Runbook|runbook-header|Direct browser call|Wallet mode/);
   assert.match(app, /<svg[^>]*aria-hidden="true"/);
 });
 

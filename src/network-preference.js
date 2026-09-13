@@ -1,6 +1,6 @@
 import { defaultNetwork, getArkadeNetwork } from './detector-core.js';
 
-const preferenceKey = 'arkade-network-api-diagnostics:network:v1';
+const preferenceKey = 'arkade-network-diagnosis:network:v1';
 
 export function loadNetworkPreference() {
   try {

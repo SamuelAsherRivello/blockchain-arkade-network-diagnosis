@@ -1,17 +1,17 @@
 <!-- AI: This README documents the implemented static detector. Keep the creator banner and section order. -->
 ![Samuel Asher Rivello](documentation/samuel-asher-rivello-banner.png)
 
-# ArkadeOS Network API Diagnostics
+# Arkade OS Network Diagnostics
 
-A browser-only React diagnostic for Arkade Signet and Mutinynet. It keeps an encrypted browser-local wallet session for the selected network and exposes public operator reads with their raw response.
+A browser-only React diagnostic for Arkade Signet and Mutinynet. Its masthead is **ArkadeOS Network API Diagnostics**. It keeps an encrypted browser-local wallet session for the selected network and exposes public operator reads with their raw response.
 
 ## Images
 
-<a href="documentation/screenshot01.png"><img src="documentation/screenshot01.png" width="400" alt="ArkadeOS network diagnostics interface" /></a>
+<a href="documentation/screenshot01.png"><img src="documentation/screenshot01.png" width="400" alt="Arkade OS Network Diagnostics interface" /></a>
 
 ## Demo
 
-* [ArkadeOS Network API Diagnostics](https://samuelasherrivello.github.io/blockchain-arkade-signet-down-detector/)
+* [Arkade OS Network Diagnostics](https://samuelasherrivello.github.io/blockchain-arkade-network-diagnosis/)
 
 ## Table of Contents
 
@@ -43,7 +43,7 @@ Requires Node.js 24 or newer.
 
 ## Project Overview
 
-Step 01, **Choose Network**, provides a Signet or Mutinynet dropdown before diagnostics begin. The React interface saves that non-sensitive preference in local storage, verifies the selected public operator, attaches a wallet only for that same network, then separates basic, asset, and contract operations. Changing the network removes the active wallet session and its in-memory records and requires a new login. Each operation displays its returned output and the explicit verdict **Backend reachable: yes** or **Backend reachable: no**. A `yes` requires a reachable response that identifies itself as the selected network.
+Step 01, **Choose Network**, provides a Signet or Mutinynet dropdown before diagnostics begin. The React interface saves that non-sensitive preference in local storage, verifies the selected public operator, attaches a wallet only for that same network, then separates basic, asset, and contract operations. The masthead contains only the project title and route status; it does not show a Route, Network, or Wallet mode summary panel. Changing the network removes the active wallet session and its in-memory records and requires a new login. Each operation displays its returned output and the explicit verdict **Backend reachable: yes** or **Backend reachable: no**. A `yes` requires a reachable response that identifies itself as the selected network.
 
 Use **Check Arkade Signet** or **Check Arkade Mutinynet** to call the selected public `/v1/info` endpoint from the current browser. The result distinguishes an unavailable browser request from evidence of an operator-wide outage.
 

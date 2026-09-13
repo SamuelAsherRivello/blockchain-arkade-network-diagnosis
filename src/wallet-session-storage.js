@@ -1,7 +1,7 @@
-const databaseName = 'arkade-signet-detector-wallet-v1';
+const databaseName = 'arkade-network-diagnosis-wallet-v1';
 const storeName = 'session';
 const recordKey = 'active';
-const additionalData = new TextEncoder().encode('arkade-signet-detector:wallet:v1');
+const additionalData = new TextEncoder().encode('arkade-network-diagnosis:wallet:v1');
 
 function openDatabase() {
   return new Promise((resolve, reject) => {
