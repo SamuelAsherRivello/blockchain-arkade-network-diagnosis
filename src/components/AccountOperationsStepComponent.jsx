@@ -1,4 +1,7 @@
 import { StepComponent } from './StepComponent.jsx';
+import { formatOperationResultSummary } from '../operation-result.js';
+import { CopyButtonComponent } from './CopyButtonComponent.jsx';
+import { DocumentationLinkComponent } from './DocumentationLinkComponent.jsx';
 
 export function AccountOperationsStepComponent({ number, title, detail, operations, results, runningId, walletAttached, onRun, beforeOperations, networkLabel }) {
   return (
@@ -16,18 +19,20 @@ export function AccountOperationsStepComponent({ number, title, detail, operatio
           return (
             <article className={`operation ${operation.mutation ? 'operation-mutation' : ''}`} key={operation.id}>
               <div className="operation-copy">
-                <h3>{operation.title}</h3>
+                <h3>{operation.title} ({operation.mutation ? 'Read/Write' : 'Read'})</h3>
                 <p>{operation.description}</p>
-                {operation.mutation ? <p className="mutation-note">This is a state-changing {networkLabel} action. It runs only when you press the button.</p> : null}
               </div>
-              <button type="button" className="operation-button" onClick={() => onRun(operation.id)} disabled={Boolean(runningId) || !walletAttached}>
-                {isRunning ? 'Calling…' : operation.action}
-              </button>
+              <div className="operation-actions">
+                <button type="button" className="operation-button" onClick={() => onRun(operation.id)} disabled={Boolean(runningId) || !walletAttached}>
+                  {isRunning ? 'Calling…' : operation.action}
+                </button>
+                <DocumentationLinkComponent href={operation.docsHref} tooltip={operation.docsTooltip} />
+              </div>
               {result ? (
                 <div className={`operation-result ${result.backendReachable === 'yes' ? 'result-online' : result.backendReachable === 'pending' ? 'result-pending' : 'result-unavailable'}`}>
-                  <p><strong>Backend reachable:</strong> {result.backendReachable}</p>
+                  <p className="operation-result-summary">{formatOperationResultSummary(result)}</p>
                   <p>{result.message}</p>
-                  {result.output ? <pre>{result.output}</pre> : null}
+                  {result.output ? <div className="copyable-payload"><pre>{result.output}</pre><CopyButtonComponent value={result.output} label={`${operation.title} output`} /></div> : null}
                 </div>
               ) : null}
             </article>

@@ -5,7 +5,7 @@ import { runOperation } from '../src/operations.js';
 
 const component = (name) => readFile(new URL(`../src/components/${name}.jsx`, import.meta.url), 'utf8');
 
-test('renders the diagnostic flow in workflow order across six React steps', async () => {
+test('renders the diagnostic flow in workflow order across seven React steps', async () => {
   const [app, step, network, operator, wallet, assetReadiness, accountOperations, operations] = await Promise.all([
     readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
     component('StepComponent'),
@@ -32,7 +32,7 @@ test('renders the diagnostic flow in workflow order across six React steps', asy
   assert.match(wallet, /Log in/);
   assert.match(wallet, /Log out/);
   assert.doesNotMatch(assetReadiness, /StepComponent/);
-  assert.match(assetReadiness, /Asset indexer reachable:/);
+  assert.match(assetReadiness, /formatOperationResultSummary/);
   assert.match(assetReadiness, /Warning: There is not enough spendable Arkade balance for this mint operation\./);
   assert.doesNotMatch(assetReadiness, /Bitcoin boarding route|receipt-bound recovery|without Bitcoin change/);
   assert.match(accountOperations, /number/);
@@ -40,9 +40,10 @@ test('renders the diagnostic flow in workflow order across six React steps', asy
   assert.doesNotMatch(accountOperations, /Click to transfer/);
   assert.match(app, /'onboard-balance': onboardHalfBalance/);
   assert.match(operations, /export function OperationListComponent/);
-  assert.match(app, /number="04"[\s\S]*title="Basic Operations"/);
-  assert.match(app, /number="05"[\s\S]*title="Asset Operations"/);
-  assert.match(app, /number="06"[\s\S]*title="Contract Operations"/);
+  assert.match(app, /BatchOperationsStepComponent/);
+  assert.match(app, /number="05"[\s\S]*title="Basic Operations"/);
+  assert.match(app, /number="06"[\s\S]*title="Asset Operations"/);
+  assert.match(app, /number="07"[\s\S]*title="Contract Operations"/);
   assert.match(operator, /number="02"/);
   assert.match(wallet, /number="03"/);
   assert.match(operator, /OperationListComponent/);
@@ -83,7 +84,7 @@ test('rates a verified selected-network response as backend reachable', async ()
   assert.match(result.output, /"network": "signet"/);
 });
 
-test('lists operator checks and exposes a reachable yes or no verdict', async () => {
+test('lists operator checks and exposes the shared result summary', async () => {
   const [operations, componentSource] = await Promise.all([
     readFile(new URL('../src/operations.js', import.meta.url), 'utf8'),
     component('OperationListComponent'),
@@ -93,7 +94,58 @@ test('lists operator checks and exposes a reachable yes or no verdict', async ()
   assert.match(operations, /fee-policy/);
   assert.match(operations, /session-schedule/);
   assert.match(operations, /backendReachable/);
-  assert.match(componentSource, /Backend reachable:/);
+  assert.match(componentSource, /formatOperationResultSummary/);
+});
+
+test('offers an accessible shared copy control for endpoints, wallet addresses, and displayed payloads', async () => {
+  const [copyButton, operator, wallet, assetReadiness, accountOperations, operations] = await Promise.all([
+    component('CopyButtonComponent'),
+    component('OperatorStepComponent'),
+    component('WalletStepComponent'),
+    component('AssetReadinessOperationComponent'),
+    component('AccountOperationsStepComponent'),
+    component('OperationListComponent'),
+  ]);
+
+  assert.match(copyButton, /navigator\.clipboard\.writeText/);
+  assert.match(copyButton, /aria-label=/);
+  assert.match(copyButton, /Copied/);
+  assert.match(operator, /CopyButtonComponent/);
+  assert.match(wallet, /CopyButtonComponent/g);
+  assert.match(assetReadiness, /CopyButtonComponent/);
+  assert.match(accountOperations, /CopyButtonComponent/);
+  assert.match(operations, /CopyButtonComponent/);
+});
+
+test('places a documented book link beside every operation action', async () => {
+  const [docsLink, app, operator, assetReadiness, accountOperations, operations, batchOperations] = await Promise.all([
+    component('DocumentationLinkComponent'),
+    readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
+    component('OperatorStepComponent'),
+    component('AssetReadinessOperationComponent'),
+    component('AccountOperationsStepComponent'),
+    component('OperationListComponent'),
+    component('BatchOperationsStepComponent'),
+  ]);
+
+  assert.match(docsLink, /className="operation-doc-link"/);
+  assert.match(docsLink, /target="_blank" rel="noreferrer"/);
+  assert.match(docsLink, /title=\{tooltip\}/);
+  assert.match(docsLink, /aria-label=\{tooltip\}/);
+  assert.match(docsLink, /viewBox="0 0 24 24"/);
+  assert.match(app, /docsHref:/g);
+  assert.match(app, /docsTooltip:/g);
+  assert.match(operator, /DocumentationLinkComponent/);
+  assert.match(assetReadiness, /DocumentationLinkComponent/);
+  assert.match(accountOperations, /DocumentationLinkComponent/);
+  assert.match(operations, /DocumentationLinkComponent/);
+  assert.match(batchOperations, /DocumentationLinkComponent/g);
+});
+
+test('anchors the address copy icon at the upper-right of the address area', async () => {
+  const css = await readFile(new URL('../src/style.css', import.meta.url), 'utf8');
+
+  assert.match(css, /\.copyable-value\s+\.copy-button\s*\{[^}]*top:\s*0/);
 });
 
 test('keeps the asset readiness component interface limited to values it renders', async () => {
@@ -144,8 +196,35 @@ test('puts accessible project resource links at the top of the page and the pers
   assert.match(network, /<select/);
   assert.doesNotMatch(app, /type="radio" name="arkade-network"/);
   assert.match(app, /ArkadeOS Network API Diagnostics/);
-  assert.doesNotMatch(app, /context-line|Runbook|runbook-header|Direct browser call|Wallet mode/);
+  assert.doesNotMatch(app, /context-line|Runbook|runbook-header|Wallet mode/);
   assert.match(app, /<svg[^>]*aria-hidden="true"/);
+});
+
+test('keeps header resources without the diagnostic-context summary', async () => {
+  const app = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8');
+
+  assert.match(app, /<span>Docs<\/span>/);
+  assert.match(app, /<span>Source<\/span>/);
+  assert.doesNotMatch(app, /console-summary|console-progress|Current diagnostic context/);
+  assert.doesNotMatch(app, /This site has no application server/);
+});
+
+test('omits the route-status UI from the header', async () => {
+  const [app, css] = await Promise.all([
+    readFile(new URL('../src/App.jsx', import.meta.url), 'utf8'),
+    readFile(new URL('../src/style.css', import.meta.url), 'utf8'),
+  ]);
+
+  assert.doesNotMatch(app, /connectionLabel|route live|route-indicator/);
+  assert.doesNotMatch(css, /route-indicator/);
+});
+
+test('asks before a network change logs out an attached wallet', async () => {
+  const app = await readFile(new URL('../src/App.jsx', import.meta.url), 'utf8');
+
+  assert.match(app, /walletSession\s*&&\s*!window\.confirm\(/);
+  assert.match(app, /Are you sure\?\\n\\nChanging networks will log you out of your wallet\./);
+  assert.ok(app.indexOf('window.confirm') < app.indexOf('await logoutWallet(network)'));
 });
 
 test('creates a one-wallet demo contract and verifies demo asset ownership rather than retaining BIS prerequisites', async () => {
@@ -160,6 +239,17 @@ test('creates a one-wallet demo contract and verifies demo asset ownership rathe
   assert.match(wallet, /wallet\.getNewAddresses\(\{ types: \['default'\], forceNew: true \}\)/);
   assert.match(wallet, /ownershipVerified: Boolean\(ownedAsset\)/);
   assert.doesNotMatch(wallet, /contractReadiness/);
+});
+
+test('labels each account operation compactly as read-only or read/write', async () => {
+  const [accountOperations, css] = await Promise.all([
+    component('AccountOperationsStepComponent'),
+    readFile(new URL('../src/style.css', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(accountOperations, /<h3>\{operation\.title\} \(\{operation\.mutation \? 'Read\/Write' : 'Read'\}\)<\/h3>/);
+  assert.doesNotMatch(accountOperations, /This is a state-changing/);
+  assert.doesNotMatch(css, /writes on click/);
 });
 
 test('makes every operator operation use the selected network', async () => {

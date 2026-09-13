@@ -24,6 +24,14 @@ export function boundedRead(read, timeoutMs, label) {
   return Promise.race([Promise.resolve().then(read), timeout]).finally(() => clearTimeout(timeoutId));
 }
 
+// Contract reads can update the SDK's connection state. Read that state only
+// after the operation it describes, otherwise a fresh-looking pre-read value
+// can incorrectly certify a cached result as live.
+export async function readWithProviderState(wallet, read) {
+  const value = await read(wallet);
+  return { value, connection: await wallet.getProviderConnectionState() };
+}
+
 function ensureSession(session, network) {
   if (!session?.identity || !session?.readonlyIdentity) throw new Error('Attach a wallet for this page session first.');
   if (session.network !== network) throw new Error('The attached wallet belongs to the previously selected network. Log in again for this network.');
@@ -78,6 +86,10 @@ export async function restoreWallet(network = defaultNetwork) {
 
 export async function logoutWallet(network = defaultNetwork) {
   await clearWalletPhrase();
+  resetLocalWalletSession(network);
+}
+
+export function resetLocalWalletSession(network = defaultNetwork) {
   sessionStorageByNetwork.delete(network);
 }
 
@@ -87,8 +99,11 @@ export async function inspectAssetMintReadiness(session, network = defaultNetwor
     if (operator.status !== 'online') return { status: 'unavailable', backendReachable: 'no', message: operator.message };
     const wallet = await readonlyWallet(session, network);
     try {
-    const spendable = await wallet.getSpendableVtxos({ withRecoverable: false, withUnrolled: false });
-    const result = assetMintReadiness(wallet.getProviderConnectionState(), spendable, Number(wallet.dustAmount));
+    const { value: spendable, connection } = await readWithProviderState(
+      wallet,
+      (currentWallet) => currentWallet.getSpendableVtxos({ withRecoverable: false, withUnrolled: false }),
+    );
+    const result = assetMintReadiness(connection, spendable, Number(wallet.dustAmount));
     return {
       ...result,
       message: result.status === 'ready'
@@ -125,10 +140,11 @@ export async function onboardHalfBalance(session, network = defaultNetwork) {
       };
       const info = await arkProvider.getInfo();
       if (info.network !== network) return unavailable(`The operator did not confirm ${getArkadeNetwork(network).label} for this onboarding request.`);
-      const readiness = boardingReadiness(wallet.getProviderConnectionState(), await wallet.getBoardingUtxos(), Number(wallet.dustAmount), true);
+      const { value: boardingUtxos, connection } = await readWithProviderState(wallet, (currentWallet) => currentWallet.getBoardingUtxos());
+      const readiness = boardingReadiness(connection, boardingUtxos, Number(wallet.dustAmount), true);
       if (readiness.status !== 'ready') {
         return readiness.backendReachable === 'yes'
-          ? reachableButBlocked('There are not enough confirmed Bitcoin boarding funds to move 50% into a spendable Arkade VTXO.', JSON.stringify(readiness, null, 2))
+          ? { ...reachableButBlocked('There are not enough confirmed Bitcoin boarding funds to move 50% into a spendable Arkade VTXO.', JSON.stringify(readiness, null, 2)), outcome: 'blocked' }
           : unavailable('The live wallet providers could not verify confirmed Bitcoin boarding funds.');
       }
       const plan = onboardingPlan(readiness);
@@ -136,6 +152,7 @@ export async function onboardHalfBalance(session, network = defaultNetwork) {
       const transactionId = await new Ramps(wallet).onboard(info.fees, readiness.inputs, BigInt(plan.firstLegAmountSats));
       return {
         backendReachable: 'yes',
+        outcome: 'submitted',
         message: `The full Bitcoin-to-Arkade first leg was submitted without a Bitcoin change output. Wait for the ${getArkadeNetwork(network).label} batch, then check balance and activity before beginning the separate 50% return leg.`,
         output: JSON.stringify({
           from: `${getArkadeNetwork(network).label} Bitcoin boarding balance`,
@@ -163,7 +180,8 @@ export async function checkAccountBalance(session, network = defaultNetwork) {
     if (operator.status !== 'online') return unavailable(operator.message);
     const wallet = await readonlyWallet(session, network);
     try {
-      const result = balanceReadiness(wallet.getProviderConnectionState(), await wallet.getBalance());
+      const { value: balance, connection } = await readWithProviderState(wallet, (currentWallet) => currentWallet.getBalance());
+      const result = balanceReadiness(connection, balance);
       if (result.status !== 'ready') return unavailable('The balance indexer did not provide fresh live data; this detector will show balances as unavailable.');
       return {
         backendReachable: 'yes',
@@ -180,8 +198,7 @@ export async function listOwnedAssets(session, network = defaultNetwork) {
     if (operator.status !== 'online') return unavailable(operator.message);
     const wallet = await readonlyWallet(session, network);
     try {
-      const connection = wallet.getProviderConnectionState();
-      const balance = await wallet.getBalance();
+      const { value: balance, connection } = await readWithProviderState(wallet, (currentWallet) => currentWallet.getBalance());
       const balanceState = balanceReadiness(connection, balance);
       if (balanceState.status !== 'ready') return unavailable('The asset indexer did not provide fresh live data; this detector will report assets as unavailable.');
       const assets = (balance.assets ?? []).map((asset) => ({ assetId: asset.assetId, amount: asset.amount.toString() }));
@@ -200,9 +217,8 @@ export async function listWalletActivity(session, network = defaultNetwork) {
     if (operator.status !== 'online') return unavailable(operator.message);
     const wallet = await readonlyWallet(session, network);
     try {
-      const connection = wallet.getProviderConnectionState();
+      const { value: activity, connection } = await readWithProviderState(wallet, (currentWallet) => currentWallet.getActivityHistory());
       if (connection.mode !== 'online' || connection.source !== 'live') return unavailable('The transaction indexer is not live; activity cannot be verified.');
-      const activity = await wallet.getActivityHistory();
       return {
         backendReachable: 'yes',
         message: activity.length ? `Wallet activity loaded from the live ${getArkadeNetwork(network).label} providers.` : `The live ${getArkadeNetwork(network).label} providers report no wallet activity.`,
@@ -225,7 +241,11 @@ export async function mintTestAsset(session, network = defaultNetwork) {
       storage: storage(network),
     });
     try {
-      const readiness = assetMintReadiness(wallet.getProviderConnectionState(), await wallet.getSpendableVtxos({ withRecoverable: false, withUnrolled: false }), Number(wallet.dustAmount));
+      const { value: spendable, connection } = await readWithProviderState(
+        wallet,
+        (currentWallet) => currentWallet.getSpendableVtxos({ withRecoverable: false, withUnrolled: false }),
+      );
+      const readiness = assetMintReadiness(connection, spendable, Number(wallet.dustAmount));
       if (!readiness.canMint) {
         return readiness.backendReachable === 'yes'
         ? reachableButBlocked('The asset backend is reachable, but this wallet lacks the verified spendable balance required for a test mint.', JSON.stringify(readiness, null, 2))
@@ -235,6 +255,7 @@ export async function mintTestAsset(session, network = defaultNetwork) {
       const ownedAsset = (await wallet.getBalance()).assets?.find((asset) => asset.assetId === result.assetId);
       return {
         backendReachable: 'yes',
+        outcome: ownedAsset ? 'success' : 'submitted',
         message: ownedAsset ? 'Demo asset created and ownership verified in the attached wallet.' : 'Demo asset issuance submitted, but ownership is not visible in the fresh wallet balance yet. Recheck owned assets.',
         output: JSON.stringify({ network, ...testAssetRequest.metadata, issuedAmount: testAssetRequest.amount.toString(), assetId: result.assetId, transactionId: result.arkTxId, ownershipVerified: Boolean(ownedAsset), ownedAmount: ownedAsset?.amount?.toString() ?? null }, null, 2),
       };
@@ -252,10 +273,12 @@ export async function inspectContracts(session, network = defaultNetwork) {
       const manager = await wallet.getContractManager();
       return { contracts: await manager.getContractsWithVtxos(), state: manager.getSyncState() };
     }, 15000, 'Contract read');
-    if (state.mode !== 'online') return unavailable('The contract indexer is degraded; contract data is not fresh.');
+    const fresh = state.mode === 'online';
     return {
       backendReachable: 'yes',
-      message: contracts.length ? `Contract records loaded from the live ${getArkadeNetwork(network).label} indexer.` : 'No contract records are visible for this wallet.',
+      message: fresh
+        ? (contracts.length ? `Contract records loaded from the live ${getArkadeNetwork(network).label} indexer.` : 'No contract records are visible for this wallet.')
+        : (contracts.length ? 'Contract records loaded from cached local state; the contract indexer is degraded, so recent changes may be missing.' : 'No contract records are visible in cached local state; the contract indexer is degraded, so recent changes may be missing.'),
       output: JSON.stringify(contracts.map(({ contract, vtxos }) => ({ label: contract.label, type: contract.type, state: contract.state, vtxoCount: vtxos.length })), null, 2),
     };
   } catch (error) {

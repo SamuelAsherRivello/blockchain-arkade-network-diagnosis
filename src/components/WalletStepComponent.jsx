@@ -1,6 +1,7 @@
 import { StepComponent } from './StepComponent.jsx';
+import { CopyButtonComponent } from './CopyButtonComponent.jsx';
 
-export function WalletStepComponent({ phrase, message, address, boardingAddress, loading, loggedIn, onPhraseChange, onLogin, onLogout, networkLabel, funding }) {
+export function WalletStepComponent({ phrase, message, address, boardingAddress, loading, loggedIn, onPhraseChange, onLogin, onLogout, onResetLocalSession, networkLabel, funding }) {
   return (
     <StepComponent
       number="03"
@@ -13,15 +14,19 @@ export function WalletStepComponent({ phrase, message, address, boardingAddress,
         <div className="funding-routes" aria-live="polite">
           <section>
             <p className="funding-label">Arkade receive address</p>
-            <output className="address">{address}</output>
+            <div className="copyable-value"><output className="address">{address}</output><CopyButtonComponent value={address} label="Arkade receive address" /></div>
           </section>
           <section>
             <p className="funding-label">{networkLabel} Bitcoin boarding address</p>
-            <output className="address">{boardingAddress}</output>
+            <div className="copyable-value"><output className="address">{boardingAddress}</output><CopyButtonComponent value={boardingAddress} label={`${networkLabel} Bitcoin boarding address`} /></div>
             <a href={funding.url} target="_blank" rel="noreferrer" aria-label="Open the selected network faucet">{funding.label}</a>
           </section>
         </div>
-        <div className="wallet-actions"><button type="button" className="secondary-action" onClick={onLogout} disabled={loading}>Log out</button></div>
+        <div className="wallet-actions">
+          <button type="button" className="secondary-action" onClick={onResetLocalSession} disabled={loading}>Reset local wallet session</button>
+          <button type="button" className="secondary-action" onClick={onLogout} disabled={loading}>Log out</button>
+        </div>
+        <p className="field-help">Reset clears only this detector’s volatile SDK data, then rebuilds the session from encrypted browser storage. It does not submit a transaction or change Signet funds.</p>
       </> : <>
         <label htmlFor="recovery-phrase">Recovery phrase</label>
         <input
