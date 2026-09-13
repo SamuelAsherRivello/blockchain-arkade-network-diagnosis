@@ -9,7 +9,7 @@ A browser-only React diagnostic for Arkade Signet and Mutinynet. Its masthead is
 
 <a href="documentation/screenshot01.png"><img src="documentation/screenshot01.png" width="400" alt="Arkade OS Network Diagnostics interface" /></a>
 
-## Demo
+## Live Demo
 
 * [Arkade OS Network Diagnostics](https://samuelasherrivello.github.io/blockchain-arkade-network-diagnosis/)
 
